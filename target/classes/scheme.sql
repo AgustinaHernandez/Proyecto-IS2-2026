@@ -51,3 +51,74 @@ CREATE TABLE students (
 
     CONSTRAINT fk_id_student FOREIGN KEY (person_id) REFERENCES persons (id)
 );
+
+DROP TABLE IF EXISTS careers;
+
+CREATE TABLE careers (
+    id INTEGER NOT NULL PRIMARY KEY,
+    name VARCHAR(25);
+
+);
+
+DROP TABLE IF EXISTS plans;
+
+CREATE TABLE plans (
+    id INTEGER NOT NULL PRIMARY KEY,
+    career_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    
+    CONSTRAINT fk_career FOREIGN KEY (career_id) REFERENCES careers (id)
+);
+
+DROP TABLE IF EXISTS subjects;
+
+CREATE TABLE subjects (
+    id INTEGER NOT NULL PRIMARY KEY,
+    responsible_id INTEGER NOT NULL,
+
+    CONSTRAINT fk_responsible FOREIGN KEY (responsible_id) REFERENCES teachers (id)
+)
+
+DROP TABLE IF EXISTS subject_belongs_plan;
+
+CREATE TABLE subject_belongs_plan(
+    subject_id INTEGER NOT NULL,
+    plan_id INTEGER NOT NULL,
+
+    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
+    CONSTRAINT fk_plan FOREIGN KEY (plan_id) REFERENCES plans (id),
+    CONSTRAINT pk_pertenece PRIMARY KEY (plan_id, subject_id)
+);
+
+DROP TABLE IF EXISTS teaches;
+
+CREATE TABLE teaches(
+    teacher_id INTEGER NOT NULL,
+    subject_id INTEGER NOT NULL,
+
+    CONSTRAINT fk_teacher FOREIGN KEY (teacher_id) REFERENCES teachers (id),
+    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
+    CONSTRAINT pk_teaches PRIMARY KEY (teacher_id, subject_id)
+);
+
+DROP TABLE IF EXISTS enrolled_subject;
+
+CREATE TABLE enrolled_subject(
+    student_id INTEGER NOT NULL,
+    subject_id INTEGER NOT NULL,
+
+    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id),
+    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
+    CONSTRAINT pk_enrolled PRIMARY KEY (student_id, subject_id)
+);
+
+DROP TABLE  IF EXISTS enrolled_plan;
+
+CREATE TABLE enrolled_plan(
+    student_id INTEGER NOT NULL,
+    plan_id INTEGER NOT NULL,
+
+    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id),
+    CONSTRAINT fk_plan FOREIGN KEY (plan_id) REFERENCES plans (id),
+    CONSTRAINT pk_enrolled_plan PRIMARY KEY (student_id, plan_id)
+);
