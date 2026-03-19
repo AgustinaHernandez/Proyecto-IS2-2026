@@ -56,7 +56,7 @@ DROP TABLE IF EXISTS careers;
 
 CREATE TABLE careers (
     id INTEGER NOT NULL PRIMARY KEY,
-    name VARCHAR(25);
+    name VARCHAR(25)
 
 );
 
@@ -77,7 +77,7 @@ CREATE TABLE subjects (
     responsible_id INTEGER NOT NULL,
 
     CONSTRAINT fk_responsible FOREIGN KEY (responsible_id) REFERENCES teachers (id)
-)
+);
 
 DROP TABLE IF EXISTS subject_belongs_plan;
 
