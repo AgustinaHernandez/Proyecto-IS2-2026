@@ -633,29 +633,14 @@ public class App {
         });
 
         post("/career/new", (req, res) -> {
-           String idStr = req.queryParams("id").trim();
            String name = req.queryParams("name").trim();
           
           
             // Validaciones básicas: campos no pueden ser nulos o vacíos.
-            if (idStr == null || idStr.isEmpty()
-                || name == null || name.isEmpty()
-            ) {
+            if (name == null || name.isEmpty()){
                String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
                res.redirect("/career/create?error=" + errorMsg);
                return "";
-            }
-
-            //Validación de código
-            Integer id = 0;
-            try {
-                id = Integer.parseInt(idStr);
-                if (id <= 0) throw new IllegalArgumentException("Código inválido"); //TODO: Discutible
-            } catch (Exception e) {
-                res.status(400);
-                String errorMsg = URLEncoder.encode("El código debe ser un número válido.", StandardCharsets.UTF_8);
-                res.redirect("/career/create?error=" + errorMsg);
-                return "";
             }
 
             //Validación de nombre
@@ -673,16 +658,14 @@ public class App {
                 Base.openTransaction();  // Iniciamos la transaccion
 
                 Career nc = new Career(); // Crea una nueva instancia del modelo Career.
-
-                nc.set("id", id);
                 nc.set("name", name);
-                nc.insert(); //insert() en lugar de saveIt(), porque id NO es autoincremental.
+                nc.saveIt();
 
                 Base.commitTransaction();               
 
                 res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
                 // Redirige al formulario de creación con un mensaje de éxito.
-                String successMsg = URLEncoder.encode("Carrera "+name+" ["+id+"] "+"registrada correctamente.",StandardCharsets.UTF_8);
+                String successMsg = URLEncoder.encode("Carrera "+name+" registrada correctamente.",StandardCharsets.UTF_8);
                 res.redirect("/career/create?message= " + successMsg);
                 return ""; // Retorna una cadena vacía.
 
