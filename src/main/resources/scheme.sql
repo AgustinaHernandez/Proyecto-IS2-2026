@@ -98,7 +98,7 @@ CREATE TABLE teaches(
     teacher_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
 
-    CONSTRAINT fk_teacher FOREIGN KEY (teacher_id) REFERENCES teachers (id),
+    CONSTRAINT fk_teacher FOREIGN KEY (teacher_id) REFERENCES teachers (id) ON DELETE CASCADE,
     CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
     CONSTRAINT pk_teaches PRIMARY KEY (teacher_id, subject_id)
 );

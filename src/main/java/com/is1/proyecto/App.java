@@ -175,7 +175,35 @@ public class App {
             return objectMapper.writeValueAsString(resultList);
         });
 
-        
+
+        get("/teacher/delete", (req, res) -> {
+            String query = req.queryParams("q");
+            List<Teacher> teachers;
+            int offset = 20;
+            if (query != null && !query.trim().isEmpty()) {
+                teachers = Teacher.findBySQL(
+                    "SELECT t.* FROM teachers t " +
+                    "JOIN persons p ON t.person_id = p.id " +
+                    "WHERE p.first_name LIKE ? OR p.last_name LIKE ? OR CAST(p.dni AS TEXT) LIKE ?",
+                    "%" + query.trim() + "%", 
+                    "%" + query.trim() + "%", 
+                    "%" + query.trim() + "% LIMIT "+offset+""
+                ).include(Person.class);
+            } else {
+                teachers = Teacher.findAll().include(Person.class);
+            }
+
+            Map<String, Object> model = Map.of(
+                "teachers", teachers,
+                "query", (query != null)? query : "",
+                "offset", offset,
+                "successMessage", req.queryParamOrDefault("message", ""),
+                "errorMessage", req.queryParamOrDefault("error", "")
+            );
+
+            return new ModelAndView(model, "teacher_delete.mustache");
+        }, new MustacheTemplateEngine());
+
         // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
         // Requiere que el usuario esté autenticado.
         get("/dashboard", (req, res) -> {
@@ -680,6 +708,35 @@ public class App {
                res.redirect("/career/create?error="+errorMsg);
                return ""; // Retorna una cadena vacía.
            }
+        });
+
+
+        post("/teacher/delete", (req, res) -> {
+            String teacherIdStr = req.queryParams("teacher_id");
+            if (teacherIdStr == null || teacherIdStr.isEmpty()) {
+                res.redirect("/teacher/delete?error=" + URLEncoder.encode("ID de docente no proporcionado.", StandardCharsets.UTF_8));
+                return "";
+            }
+            try {
+                Base.openTransaction();
+                Teacher t = Teacher.findById(Integer.parseInt(teacherIdStr));
+                if (t != null) {
+                    // asi que existis todavia... no te vas a salvar de la eliminacion eh
+                    t.delete();
+                    Base.commitTransaction();
+                    
+                    String successMsg = URLEncoder.encode("Docente eliminado correctamente del sistema.", StandardCharsets.UTF_8);
+                    res.redirect("/teacher/delete?message=" + successMsg);
+                } else {
+                    Base.rollbackTransaction();
+                    res.redirect("/teacher/delete?error=" + URLEncoder.encode("El docente no existe.", StandardCharsets.UTF_8));
+                }
+            } catch (Exception e) {
+                Base.rollbackTransaction();
+                e.printStackTrace();
+                res.redirect("/teacher/delete?error=" + URLEncoder.encode("Error interno al eliminar el docente.", StandardCharsets.UTF_8));
+            }
+            return "";
         });
 
     } // Fin del método main
