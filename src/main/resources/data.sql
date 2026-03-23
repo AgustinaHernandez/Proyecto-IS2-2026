@@ -4,7 +4,15 @@
 DELETE FROM teachers;
 DELETE FROM users;
 DELETE FROM persons;
-DELETE FROM persons;
+DELETE FROM enrolled_subject;
+DELETE FROM enrolled_plan;
+DELETE FROM teaches;
+DELETE FROM subject_belongs_plan;
+DELETE FROM subjects;
+DELETE FROM plans;
+DELETE FROM careers;
+DELETE FROM students;
+
 
 -- Insertar Personas
 INSERT INTO persons (dni, first_name, last_name) VALUES 
@@ -31,18 +39,70 @@ INSERT INTO users (name, password, is_admin) VALUES
 
 
 -- Insertar profesores
-INSERT INTO teachers (person_id, degree, email) 
-VALUES (2, 'LICENCIATURA', 'fran@cs.com');
+INSERT INTO teachers (person_id, degree, email) VALUES
+(2, 'LICENCIATURA', 'fran@cs.com'),
+(6, 'LICENCIATURA', 'hose@cs.com'),
+(7, 'LICENCIATURA', 'santiago@cs.com');
 
-INSERT INTO teachers (person_id, degree, email) 
-VALUES (6, 'LICENCIATURA', 'hose@cs.com');
+-- Insertar estudiantes (convertir las personas en estudiantes)
+INSERT INTO students (person_id) VALUES 
+(3), -- agus
+(4), -- adrian
+(5), -- jose
+(8); -- francisco
 
-INSERT INTO teachers (person_id, degree, email) 
-VALUES (7, 'LICENCIATURA', 'santiago@cs.com');
 
+---  Inserts de estructuras académicas -------------------------------------------
 
--- INsertar materias
+-- Insertar materias
 INSERT INTO subjects (code, name, responsible_id) VALUES 
 (101, 'Programación I', 1),
 (102, 'Ingeniería de Software I', 3),
 (103, 'Sistemas Operativos', 2);
+
+-- Insertar Carreras
+INSERT INTO careers (id, name) VALUES 
+(1, 'Analista en Computación'),
+(2, 'Lic. en Computación'),
+(3, 'Prof. en Computación');
+
+-- Insertar Planes
+INSERT INTO plans (career_id, version, status) VALUES 
+(1, 2019, "VIGENTE"),
+(2, 2020, "VIGENTE"),
+(3, 2015, "VIGENTE");
+
+-- Vincular Materias a los Planes
+INSERT INTO subject_belongs_plan (subject_id, plan_id) VALUES 
+(1, 1), (2, 1), (3, 1), -- Analista
+(1, 2), (2, 2), (3, 2), -- Licenciatura
+(1, 3);                 -- Profesorado
+
+
+--- Inserts de Roles ----------------------------------------------------------
+
+-- Asignacion de docentes a materias
+INSERT INTO teaches (teacher_id, subject_id) VALUES 
+(2, 1), -- Hose, Programacion I
+(3, 1), -- Santiago, en Programacion I
+(1, 2), -- Fran, en Ing. de Software I
+(3, 3); -- Santiago, Sistemas Operativos
+
+
+--- Inscripciones de Alumnos ------------------------------------------------
+
+-- Inscribir Estudiantes a los Planes
+INSERT INTO enrolled_plan (student_id, plan_id) VALUES 
+(1, 2), -- Agus Licenciatura
+(2, 2), -- Adrian Licenciatura
+(3, 1), -- Jose Analista
+(4, 3); -- Francisco Profesorado
+
+-- Inscribir Estudiantes a las Materias
+INSERT INTO enrolled_subject (student_id, subject_id) VALUES 
+(1, 2),
+(1, 3),
+(2, 1),
+(3, 1),
+(4, 1);
+

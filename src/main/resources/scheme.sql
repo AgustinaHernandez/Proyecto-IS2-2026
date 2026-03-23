@@ -46,7 +46,7 @@ CREATE TABLE teachers (
 DROP TABLE IF EXISTS students;
 
 CREATE TABLE students (
-    id INTEGER NOT NULL PRIMARY KEY,
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     person_id INTEGER NOT NULL,
 
     CONSTRAINT fk_id_student FOREIGN KEY (person_id) REFERENCES persons (id)
@@ -63,9 +63,19 @@ CREATE TABLE careers (
 DROP TABLE IF EXISTS plans;
 
 CREATE TABLE plans (
-    id INTEGER NOT NULL PRIMARY KEY,
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     career_id INTEGER NOT NULL,
     version INTEGER NOT NULL,
+    status TEXT NOT NULL,
+
+    CONSTRAINT valid_status CHECK (
+        status IN (
+            'VIGENTE',
+            'A TERMINO',
+            'SUSPENDIDO'
+        )
+    ),
+
     
     CONSTRAINT fk_career FOREIGN KEY (career_id) REFERENCES careers (id)
 );

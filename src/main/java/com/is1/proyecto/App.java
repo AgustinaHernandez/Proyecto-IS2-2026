@@ -2,6 +2,8 @@ package com.is1.proyecto; // Define el paquete de la aplicación, debe coincidir
 
 // Importaciones necesarias para la aplicación Spark
 import com.fasterxml.jackson.databind.ObjectMapper; // Utilidad para serializar/deserializar objetos Java a/desde JSON.
+import com.github.mustachejava.MustacheException;
+
 import static spark.Spark.*; // Importa los métodos estáticos principales de Spark (get, post, before, after, etc.).
 
 // Importaciones específicas para ActiveJDBC (ORM para la base de datos)
@@ -230,7 +232,6 @@ public class App {
 
 
         get("/subject/create", (req, res) -> {
-            //checkAdminAccess(req, res);
             // select de todos los profesores con sus datos de la tabla persona
             List<Teacher> teachers = Teacher.findAll().include(Person.class);
             // buscamos los planes
@@ -263,6 +264,19 @@ public class App {
             // Renderiza la plantilla 'career_form.mustache' con los datos del modelo.
             return new ModelAndView(model, "career_form.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
+
+
+        get("/plan/update",(req, res) -> { 
+            List<Plan> plans = Plan.findAll().include(Career.class);
+
+            Map<String, Object> model = Map.of(
+                "plans", plans,
+                "errorMessage", req.queryParamOrDefault("errorMessage", ""),
+                "successMessage", req.queryParamOrDefault("successMessage", "")
+            );
+            return new ModelAndView(model, "plan_update.mustache");
+
+        }, new MustacheTemplateEngine());
 
 
         // --- Rutas POST para manejar envíos de formularios y APIs ---
@@ -418,7 +432,7 @@ public class App {
             String respId = req.queryParams("responsible_id");
             String planId = req.queryParams("plan_id");
 
-            if (id == null || name == null || respId == null || id.isEmpty() || name.isEmpty() || planId == null) {
+            if (id == null || name == null || respId == null || id.isEmpty() || name.isEmpty() || planId == null || planId.isEmpty()) {
                 res.redirect("/subject/create?error=" + URLEncoder.encode("Faltan datos obligatorios", "UTF-8"));
                 return "";
             }
@@ -499,7 +513,32 @@ public class App {
            }
         });
 
+        post("/plan/update", (req, res) -> {
+            String planId = req.queryParams("plan_id");
+            String nuevoEstado = req.queryParams("status");
 
+            System.out.println("DEBUG POST PLAN: planId=[" + planId + "] | estado=[" + nuevoEstado + "]");
+
+            if (planId == null || planId.isEmpty() || nuevoEstado == null || nuevoEstado.isEmpty()) {
+                res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("Debes seleccionar un plan y un estado", "UTF-8"));
+                return "";
+            }
+
+            try {
+                Plan p = Plan.findById(Integer.parseInt(planId));
+                if (p != null) {
+                    p.set("status", nuevoEstado);
+                    p.saveIt();
+                    res.redirect("/plan/update?successMessage=" + URLEncoder.encode("El plan fue actualizado con éxito :D", "UTF-8"));
+                } else {
+                    res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("El plan no existe", "UTF-8"));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("Error: ", "UTF-8"));
+            }
+            return "";
+        });
         
 
     } // Fin del método main

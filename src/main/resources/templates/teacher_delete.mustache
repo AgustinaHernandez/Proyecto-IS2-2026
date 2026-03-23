@@ -84,12 +84,21 @@
                 </tbody>
             </table>
         </div>
-        
-        <div class="mt-6 text-center">
-            <a href="/dashboard" class="text-blue-600 dark:text-blue-400 hover:underline"><- Anterior</a>
-            <a href="/dashboard" class="text-blue-600 dark:text-blue-400 hover:underline">Siguiente -> </a>
-        </div>
 
+        <div class="mt-6 flex justify-center items-center gap-4">
+            {{#hasPrev}}
+            <a href="/teacher/delete?q={{query}}&page={{prevPage}}" class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium">
+                &larr; Anterior
+            </a>
+            {{/hasPrev}}
+
+            {{#hasNext}}
+            <a href="/teacher/delete?q={{query}}&page={{nextPage}}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors font-medium">
+                Siguiente &rarr;
+            </a>
+            {{/hasNext}}
+
+        </div>
 
         <div class="mt-6 text-center">
             <a href="/dashboard" class="text-blue-600 dark:text-blue-400 hover:underline">← Volver al Dashboard</a>
