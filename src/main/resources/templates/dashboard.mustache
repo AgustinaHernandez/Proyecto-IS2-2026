@@ -80,12 +80,23 @@
             </div>
             {{/is_admin}}
 
-            <!-- TARJETA CARRERAS -->
+            <!-- TARJETA MODIFICACION DE PLAN -->
             {{#is_admin}}
-            <div class="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 p-6 rounded-lg text-center shadow-sm">
-                <h2 class="text-2xl font-bold text-purple-700 dark:text-purple-300 mb-3">Carreras</h2>
-                <p class="text-gray-600 dark:text-gray-400 mb-4">Agrega una carrera al sistema.</p>
-                <a href="/career/create" class="inline-block bg-purple-500 text-white py-2 px-4 rounded-md hover:bg-purple-600 transition duration-300">Agregar carrera</a>
+            <div class="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 p-6 rounded-lg text-center shadow-sm">
+                <h2 class="text-2xl font-bold text-indigo-700 dark:text-indigo-300 mb-3">Planes de Estudio</h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">Actualiza el estado de los planes del sistema.</p>
+                <a href="/plan/update" class="inline-block bg-indigo-500 text-white py-2 px-4 rounded-md hover:bg-indigo-600 transition duration-300">Modificar plan</a>
+            </div>
+            {{/is_admin}}
+            
+            <!-- TARJETA BAJA DE PROFESOR -->
+            {{#is_admin}}
+            <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-6 rounded-lg text-center shadow-sm">
+                <h2 class="text-2xl font-bold text-red-700 dark:text-red-300 mb-3">Baja de Docentes</h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">Busca y elimina docentes del sistema académico.</p>
+                <a href="/teacher/delete" class="inline-block bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition duration-300">
+                    Baja de docente
+                </a>
             </div>
             {{/is_admin}}
             
