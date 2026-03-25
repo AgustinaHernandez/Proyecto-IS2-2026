@@ -98,19 +98,13 @@ public class App {
         // GET: Muestra el formulario de creación de cuenta.
         // Soporta la visualización de mensajes de éxito o error pasados como query parameters.
         get("/user/create", (req, res) -> {
-            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
 
             // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Cuenta creada!)
-            String successMessage = req.queryParams("message");
-            if (successMessage != null && !successMessage.isEmpty()) {
-                model.put("successMessage", successMessage);
-            }
-
-            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
-            String errorMessage = req.queryParams("error");
-            if (errorMessage != null && !errorMessage.isEmpty()) {
-                model.put("errorMessage", errorMessage);
-            }
+            Map<String, Object> model = Map.of(
+                "tituloPagina", "Crear una cuenta",
+                "errorMessage", req.queryParamOrDefault("error", ""),
+                "successMessage", req.queryParamOrDefault("message", "")
+            );
 
             // Renderiza la plantilla 'user_form.mustache' con los datos del modelo.
             return new ModelAndView(model, "user_form.mustache");
@@ -154,9 +148,10 @@ public class App {
                 res.redirect("/login");
                 return null;
             }
-
+            model.put("tituloPagina", "Configuración");
             return new ModelAndView(model, "settings.mustache");
         }, new MustacheTemplateEngine());
+
         // GET: Ruta para cerrar la sesión del usuario.
         get("/logout", (req, res) -> {
             // Invalida completamente la sesión del usuario.
@@ -226,6 +221,7 @@ public class App {
 
             model.put("userId", currentUser.getId());
             model.put("username", currentUsername); 
+            model.put("tituloPagina", "Perfil de Usuario");
             
             return new ModelAndView(model, "perfil_usuario.mustache");
         }, new MustacheTemplateEngine());
@@ -238,6 +234,7 @@ public class App {
             List<Plan> plans = Plan.findAll().include(Career.class); 
             // mapeo para pasarle al mustache luego
             Map<String, Object> model = Map.of(
+                "tituloPagina", "Alta de materia",
                 "teachers", teachers,
                 "plans", plans, // agregar planes al modelo
                 "errorMessage", req.queryParamOrDefault("errorMessage", ""),
@@ -261,6 +258,8 @@ public class App {
                 model.put("errorMessage", errorMessage);
             }
 
+            model.put("tituloPagina", "Alta de carrera");
+
             // Renderiza la plantilla 'career_form.mustache' con los datos del modelo.
             return new ModelAndView(model, "career_form.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
@@ -271,6 +270,7 @@ public class App {
 
             Map<String, Object> model = Map.of(
                 "plans", plans,
+                "tituloPagina", "Modificación de plan",
                 "errorMessage", req.queryParamOrDefault("errorMessage", ""),
                 "successMessage", req.queryParamOrDefault("successMessage", "")
             );
@@ -326,6 +326,7 @@ public class App {
         // POST: Maneja el envío del formulario de inicio de sesión.
         post("/login", (req, res) -> {
             Map<String, Object> model = new HashMap<>(); // Modelo para la plantilla de login o dashboard.
+            model.put("tituloPagina","Iniciar Sesión");
 
             String username = req.queryParams("username");
             String plainTextPassword = req.queryParams("password");
@@ -373,6 +374,7 @@ public class App {
 
                 model.put("username", username); // Añade el nombre de usuario al modelo para el dashboard.
                 model.put("is_admin", is_adminUser);
+                model.put("tituloPagina", "Dashboard - Bienvenido");
                 // Renderiza la plantilla del dashboard tras un login exitoso.
                 return new ModelAndView(model, "dashboard.mustache");
             } else {

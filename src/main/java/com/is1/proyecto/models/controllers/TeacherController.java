@@ -24,18 +24,13 @@ public class TeacherController {
          *      Alta de profesor
          */
         get("/teacher/create", (req, res) -> {
-            Map<String, Object> model = new HashMap<>();
 
-            String successMessage = req.queryParams("message");
-            if (successMessage != null && !successMessage.isEmpty()) {
-                model.put("successMessage", successMessage);
-            }
-
-            String errorMessage = req.queryParams("error");
-            if (errorMessage != null && !errorMessage.isEmpty()) {
-                model.put("errorMessage", errorMessage);
-            }
-
+            Map<String, Object> model = Map.of(
+                "tituloPagina", "Alta de profesor",
+                "errorMessage", req.queryParamOrDefault("error", ""),
+                "successMessage", req.queryParamOrDefault("message", "")
+            );
+            
             return new ModelAndView(model, "teacher_form.mustache");
         }, engine);
 
@@ -145,6 +140,7 @@ public class TeacherController {
                 teachers = java.util.Collections.emptyList();
             }
             Map<String, Object> model = Map.of(
+                "tituloPagina", "Asignar Profesor a Materia",
                 "teachers", teachers,
                 "subjects", subjects, 
                 "searchQuery", searchQuery != null ? searchQuery : "",
@@ -234,6 +230,7 @@ public class TeacherController {
             }
 
             Map<String, Object> model = Map.of(
+                "tituloPagina", "Baja de docentes",
                 "teachers", teachers,
                 "query", (query != null)? query : "",
                 "offset", offset,
