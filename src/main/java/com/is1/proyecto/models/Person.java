@@ -33,5 +33,13 @@ public class Person extends Model{
     public void setDNI(int dni) {
         set("dni", dni);
     }
+
+    public String getMail(){
+        return getString("mail");
+    }
+
+    public void setMail(String mail){
+        set("mail", mail);
+    }
     
 }

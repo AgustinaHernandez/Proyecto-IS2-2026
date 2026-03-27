@@ -58,14 +58,6 @@ public class Teacher extends Model {
     public void setDegree(String degree){
         set("degree", degree);
     }
-    
-    public String getMail(){
-        return getString("mail");
-    }
-
-    public void setMail(String mail){
-        set("mail", mail);
-    }
 
     public String getFullNameString() {
         return getFirstName() + " " + getLastName();

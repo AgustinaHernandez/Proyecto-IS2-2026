@@ -20,11 +20,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.List;
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
+import java.util.concurrent.CompletableFuture;
 
 // Importaciones de clases del proyecto
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 import com.is1.proyecto.models.*;
 import com.is1.proyecto.models.controllers.TeacherController;
+import com.is1.proyecto.utils.EmailSender;
+import com.is1.proyecto.utils.PasswordGenerator;
 
 
 /**
@@ -297,6 +300,24 @@ public class App {
             return new ModelAndView(model, "student_del.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
 
+        get("/student/create", (req, res) -> {
+            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
+
+            // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Carrera agregada!)
+            String successMessage = req.queryParams("message");
+            if (successMessage != null && !successMessage.isEmpty()) {
+                model.put("successMessage", successMessage);
+            }
+
+            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
+            String errorMessage = req.queryParams("error");
+            if (errorMessage != null && !errorMessage.isEmpty()) {
+                model.put("errorMessage", errorMessage);
+            }
+
+            // Renderiza la plantilla 'career_form.mustache' con los datos del modelo.
+            return new ModelAndView(model, "student_form.mustache");
+        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
         
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
@@ -592,6 +613,137 @@ public class App {
             return "";
         });
         
+        post("/student/new", (req, res) -> {
+            String firstname = req.queryParams("firstname").trim();
+            String lastname = req.queryParams("lastname").trim();
+            String dniStr = req.queryParams("dni").trim();
+            String email = req.queryParams("email").trim();
+            
+            // Validaciones básicas: campos no pueden ser nulos o vacíos.
+            if (firstname == null || firstname.isEmpty()
+                || lastname == null || lastname.isEmpty() || email == null || email.isEmpty()
+                || dniStr == null || dniStr.isEmpty()
+            ) {
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/student/create?error=" + errorMsg);
+               return "";
+            }
+            //Validación de nombre
+            String result = firstname.replaceAll("\\d", ""); //Quitar todos los números del firstname
+            if(result.length() != firstname.length()){ //Chequear si cambió la longitud
+                String errorMsg = URLEncoder.encode("El nombre no puede contener números.", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return "";
+            }
+            //Validación de apellido
+            result = lastname.replaceAll("\\d", ""); //Quitar todos los números del lastname
+            if(result.length() != lastname.length()){ //Chequear si cambió la longitud
+                String errorMsg = URLEncoder.encode("El apellido no puede contener números.", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return "";
+            }
+            //Validación de mail
+            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+            if(!email.matches(emailRegex)) {
+                String errorMsg = URLEncoder.encode("Ingrese un correo electrónico válido (ej: usuario@dominio.com).", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return "";
+            }
+            //Validación de DNI
+            Integer dni = 0;
+            try {
+                dni = Integer.parseInt(dniStr);
+                if (dni <= 0) throw new IllegalArgumentException("DNI inválido");
+            } catch (Exception e) {
+                res.status(400);
+                String errorMsg = URLEncoder.encode("El DNI debe ser un número válido.", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return "";
+            }
+
+            //Principal
+            try {
+                Base.openTransaction();
+
+                Person p = Person.findFirst("dni = ?", dni);
+                if (p == null) {
+                    p = new Person(); 
+                    p.set("first_name", firstname);
+                    p.set("last_name", lastname);
+                    p.set("dni", dni);
+                    p.set("email", email);
+                    p.saveIt();
+                } else {
+                    Student existingStudent = Student.findFirst("person_id = ?", p.getId());
+                    if (existingStudent != null) {
+                        Base.rollbackTransaction();
+                        String errorMsg = URLEncoder.encode("Esta persona ya está registrada como estudiante.", StandardCharsets.UTF_8);
+                        res.redirect("/student/create?error=" + errorMsg);
+                        return "";
+                    }
+                }
+                Student ac = new Student();
+                ac.set("person_id", p.getId());
+                ac.saveIt();
+                User u = User.findFirst("name = ?", dniStr);
+                String randomPassword = PasswordGenerator.generateSecurePassword(8);
+                if (u == null) {
+                    u = new User();
+                    String hashedPassword = BCrypt.hashpw(randomPassword, BCrypt.gensalt());
+                    u.set("name", dniStr);
+                    u.set("password", hashedPassword); 
+                    u.set("person_id", p.getId());
+                    u.set("is_admin", 0);
+                    u.saveIt();
+                }
+                Base.commitTransaction();               
+                String formatted = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);\">\n" +
+                "    <div style=\"background-color: #2563eb; padding: 20px; text-align: center;\">\n" +
+                "        <h2 style=\"color: #ffffff; margin: 0;\">¡Bienvenido al Sistema de Información!</h2>\n" +
+                "    </div>\n" +
+                "    <div style=\"padding: 30px; color: #333333; background-color: #ffffff;\">\n" +
+                "        <p style=\"font-size: 16px;\">Hola <strong>" + firstname + " " + lastname + "</strong>,</p>\n" +
+                "        <p style=\"font-size: 16px; line-height: 1.5;\">Tu cuenta ha sido creada con éxito. A continuación, te dejamos tus credenciales temporales de acceso:</p>\n" +
+                "        \n" +
+                "        <div style=\"background-color: #f3f4f6; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 5px solid #2563eb;\">\n" +
+                "            <p style=\"margin: 0 0 10px 0; font-size: 16px;\"><strong>👤 Usuario (DNI):</strong> " + dniStr + "</p>\n" +
+                "            <p style=\"margin: 0; font-size: 16px;\"><strong>🔑 Contraseña:</strong> <span style=\"font-family: monospace; background: #e5e7eb; padding: 3px 8px; border-radius: 4px; font-size: 18px; letter-spacing: 1px;\">" + randomPassword + "</span></p>\n" +
+                "        </div>\n" +
+                "        \n" +
+                "        <p style=\"font-size: 14px; color: #666666; background-color: #fffbeb; padding: 10px; border-left: 4px solid #f59e0b; border-radius: 4px;\">\n" +
+                "            ⚠️ <strong>Importante:</strong> Por cuestiones de seguridad, te pedimos que ingreses al sistema y cambies esta contraseña lo antes posible.\n" +
+                "        </p>\n" +
+                "        <br>\n" +
+                "        <p style=\"font-size: 14px; color: #666666; margin-bottom: 0;\">Saludos cordiales,<br><strong>El equipo de Administración</strong></p>\n" +
+                "    </div>\n" +
+                "</div>";
+                String asunto = "Tus credenciales de acceso al sistema";
+
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        EmailSender.sendMail(email,asunto,formatted);
+                    } catch (Exception e) {
+                        System.err.println("Error enviando correo asíncrono a " + email);
+                        e.printStackTrace();
+                    }
+                });
+
+                res.status(201); 
+                String successMsgText = "Estudiante " + firstname + " " + lastname + " registrado correctamente.";
+                String successMsg = URLEncoder.encode(successMsgText, StandardCharsets.UTF_8);
+
+                res.redirect("/student/create?message=" + successMsg);
+                return "";
+
+           } catch (Exception e) {
+                Base.rollbackTransaction(); 
+                e.printStackTrace(); 
+                res.status(500); 
+                String errorMsg = URLEncoder.encode("ERROR interno al procesar el registro.", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return ""; 
+           }
+       });
 
     } // Fin del método main
 

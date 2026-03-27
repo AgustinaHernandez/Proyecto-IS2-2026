@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 # script para resetear la base  de datos
 # 	-borra dev.db
 #  	-vuelve a cargar scheme.sql y data.sql
