@@ -278,7 +278,26 @@ public class App {
 
         }, new MustacheTemplateEngine());
 
+        get("/student/delete", (req, res) -> {
+            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
 
+            // Obtener y añadir mensaje de éxito de los query parameters
+            String successMessage = req.queryParams("message");
+            if (successMessage != null && !successMessage.isEmpty()) {
+                model.put("successMessage", successMessage);
+            }
+
+            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
+            String errorMessage = req.queryParams("error");
+            if (errorMessage != null && !errorMessage.isEmpty()) {
+                model.put("errorMessage", errorMessage);
+            }
+
+            // Renderiza la plantilla 'student_del.mustache' con los datos del modelo.
+            return new ModelAndView(model, "student_del.mustache");
+        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
+
+        
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
         // POST: Maneja el envío del formulario de creación de nueva cuenta.
@@ -538,6 +557,37 @@ public class App {
             } catch (Exception e) {
                 e.printStackTrace();
                 res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("Error: ", "UTF-8"));
+            }
+            return "";
+        });
+
+        post("/student/remove", (req, res) -> {
+            String id = req.queryParams("id");
+
+            if(id == null || id.isEmpty()){
+                res.redirect("/student/delete?error=" + URLEncoder.encode("Faltan datos obligatorios", "UTF-8"));
+                return "";
+            }
+
+            try {
+                Base.openTransaction();
+                Student st = Student.findById(Integer.parseInt(id));
+                if(st != null && st.delete()){
+                    Base.commitTransaction();
+                    String successMsg = URLEncoder.encode("Estudiante ["+id+"] eliminado correctamente.",StandardCharsets.UTF_8);
+                    res.redirect("/student/delete?message= " + successMsg);
+                    return "";
+
+                } else {
+                    Base.rollbackTransaction();
+                    res.redirect("/student/delete?error=" + URLEncoder.encode("Error: Código inválido", "UTF-8"));
+                    return "";
+                }
+
+            } catch(Exception e){
+                Base.rollbackTransaction();
+                e.printStackTrace();
+                res.redirect("/student/delete?error=" + URLEncoder.encode("Error", "UTF-8"));
             }
             return "";
         });
