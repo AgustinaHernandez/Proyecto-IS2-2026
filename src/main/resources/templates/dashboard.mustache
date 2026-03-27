@@ -79,6 +79,17 @@
                 </a>
             </div>
             {{/is_admin}}
+
+            <!-- TARJETA ALTA DE ESTUDIANTE -->
+            {{#is_admin}}
+            <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-6 rounded-lg text-center shadow-sm">
+                <h2 class="text-2xl font-bold text-red-700 dark:text-red-300 mb-3">Alta de Estudiante</h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">Registrar estudiante en el sistema y generarle un usuario</p>
+                <a href="/student/create" class="inline-block bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition duration-300">
+                    Registrar estudiante
+                </a>
+            </div>
+            {{/is_admin}}
             
         </div>
 
