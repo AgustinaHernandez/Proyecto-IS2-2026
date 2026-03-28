@@ -1,5 +1,6 @@
 # Compiled class file
 *.class
+.sh
 
 # Log file
 *.log
@@ -27,3 +28,17 @@ replay_pid*
 *.properties
 *.xml
 *.txt
+resetdb.sh
+target/surefire-reports/TEST-com.is1.proyecto.AppTest.xml
+target/surefire-reports/com.is1.proyecto.AppTest.txt
+target/maven-status/maven-compiler-plugin/testCompile/default-testCompile/inputFiles.lst
+target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
+target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+target/maven-archiver/pom.properties
+
+# Ignorar compilados de Maven
+target/
+
+# Ignorar bases de datos de SQLite
+*.db
+*.sqlite

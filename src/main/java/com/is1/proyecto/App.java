@@ -2,6 +2,8 @@ package com.is1.proyecto; // Define el paquete de la aplicación, debe coincidir
 
 // Importaciones necesarias para la aplicación Spark
 import com.fasterxml.jackson.databind.ObjectMapper; // Utilidad para serializar/deserializar objetos Java a/desde JSON.
+import com.github.mustachejava.MustacheException;
+
 import static spark.Spark.*; // Importa los métodos estáticos principales de Spark (get, post, before, after, etc.).
 
 // Importaciones específicas para ActiveJDBC (ORM para la base de datos)
@@ -18,10 +20,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.List;
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
+import java.util.concurrent.CompletableFuture;
 
 // Importaciones de clases del proyecto
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 import com.is1.proyecto.models.*;
+import com.is1.proyecto.models.controllers.TeacherController;
+import com.is1.proyecto.utils.EmailSender;
+import com.is1.proyecto.utils.PasswordGenerator;
 
 
 /**
@@ -46,25 +52,31 @@ public class App {
 
         // --- Filtro 'before' para gestionar la conexión a la base de datos ---
         // Este filtro se ejecuta antes de cada solicitud HTTP.
-        before((req, res) -> {
+        before("/*", (req, res) -> {
             try {
-                // Abre una conexión a la base de datos utilizando las credenciales del singleton.
-                Base.open(dbConfig.getDriver(), dbConfig.getDbUrl(), dbConfig.getUser(), dbConfig.getPass());
-                System.out.println(req.url());
-
+                if (!Base.hasConnection()) {
+                    Base.open(dbConfig.getDriver(), dbConfig.getDbUrl(), dbConfig.getUser(), dbConfig.getPass());
+                }
             } catch (Exception e) {
-                // Si ocurre un error al abrir la conexión, se registra y se detiene la solicitud
-                // con un código de estado 500 (Internal Server Error) y un mensaje JSON.
-                System.err.println("Error al abrir conexión con ActiveJDBC: " + e.getMessage());
-                halt(500, "{\"error\": \"Error interno del servidor: Fallo al conectar a la base de datos.\"}" + e.getMessage());
+                System.err.println("Error crítico al abrir la DB: " + e.getMessage());
+                halt(500, "Error interno de base de datos.");
             }
         });
-
         // Filtro de seguridad que restringe el acceso solo al admin
         // Las rutas protegidas revisan el atributo is_admin de la sesion
         before("/teacher/create", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/new", (req, res) -> checkAdminAccess(req, res));
-        
+        before("/teacher/assign", (req, res) -> checkAdminAccess(req, res));
+        before("/subject/new", (req, res) -> checkAdminAccess(req, res));
+        before("/career/create", (req, res) -> checkAdminAccess(req, res));
+        before("/career/new", (req, res) -> checkAdminAccess(req, res));
+
+        // --- Filtro 'after-after' para cerrar la conexión a la base de datos pase lo que pase---
+        afterAfter("/*", (req, res) -> {
+            if (Base.hasConnection()) {
+                Base.close();
+            }
+        });
 
         // --- Filtro 'after' para cerrar la conexión a la base de datos ---
         // Este filtro se ejecuta después de que cada solicitud HTTP ha sido procesada.
@@ -78,49 +90,31 @@ public class App {
             }
         });
 
+
+        MustacheTemplateEngine engine = new MustacheTemplateEngine();
+
+        TeacherController.registrarRutas(engine, objectMapper);
+        
+
         // --- Rutas GET para renderizar formularios y páginas HTML ---
 
         // GET: Muestra el formulario de creación de cuenta.
         // Soporta la visualización de mensajes de éxito o error pasados como query parameters.
         get("/user/create", (req, res) -> {
-            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
 
             // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Cuenta creada!)
-            String successMessage = req.queryParams("message");
-            if (successMessage != null && !successMessage.isEmpty()) {
-                model.put("successMessage", successMessage);
-            }
-
-            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
-            String errorMessage = req.queryParams("error");
-            if (errorMessage != null && !errorMessage.isEmpty()) {
-                model.put("errorMessage", errorMessage);
-            }
+            Map<String, Object> model = Map.of(
+                "tituloPagina", "Crear una cuenta",
+                "errorMessage", req.queryParamOrDefault("error", ""),
+                "successMessage", req.queryParamOrDefault("message", "")
+            );
 
             // Renderiza la plantilla 'user_form.mustache' con los datos del modelo.
             return new ModelAndView(model, "user_form.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
 
-        get("/teacher/create", (req, res) -> {
-            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
-
-            // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Cuenta creada!)
-            String successMessage = req.queryParams("message");
-            if (successMessage != null && !successMessage.isEmpty()) {
-                model.put("successMessage", successMessage);
-            }
-
-            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
-            String errorMessage = req.queryParams("error");
-            if (errorMessage != null && !errorMessage.isEmpty()) {
-                model.put("errorMessage", errorMessage);
-            }
-
-            // Renderiza la plantilla 'user_form.mustache' con los datos del modelo.
-            return new ModelAndView(model, "teacher_form.mustache");
-        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
-
         
+
         // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
         // Requiere que el usuario esté autenticado.
         get("/dashboard", (req, res) -> {
@@ -157,9 +151,10 @@ public class App {
                 res.redirect("/login");
                 return null;
             }
-
+            model.put("tituloPagina", "Configuración");
             return new ModelAndView(model, "settings.mustache");
         }, new MustacheTemplateEngine());
+
         // GET: Ruta para cerrar la sesión del usuario.
         get("/logout", (req, res) -> {
             // Invalida completamente la sesión del usuario.
@@ -229,25 +224,101 @@ public class App {
 
             model.put("userId", currentUser.getId());
             model.put("username", currentUsername); 
+            model.put("tituloPagina", "Perfil de Usuario");
             
             return new ModelAndView(model, "perfil_usuario.mustache");
         }, new MustacheTemplateEngine());
 
 
         get("/subject/create", (req, res) -> {
-            //checkAdminAccess(req, res);
             // select de todos los profesores con sus datos de la tabla persona
             List<Teacher> teachers = Teacher.findAll().include(Person.class);
+            // buscamos los planes
+            List<Plan> plans = Plan.findAll().include(Career.class); 
             // mapeo para pasarle al mustache luego
             Map<String, Object> model = Map.of(
-                "teachers", teachers,        // orDefault "" es porque no puede ser null
+                "tituloPagina", "Alta de materia",
+                "teachers", teachers,
+                "plans", plans, // agregar planes al modelo
                 "errorMessage", req.queryParamOrDefault("errorMessage", ""),
                 "successMessage", req.queryParamOrDefault("successMessage", "")
             );
             return new ModelAndView(model, "subject_form.mustache");
         }, new MustacheTemplateEngine());
 
+        get("/career/create", (req, res) -> {
+            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
 
+            // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Carrera agregada!)
+            String successMessage = req.queryParams("message");
+            if (successMessage != null && !successMessage.isEmpty()) {
+                model.put("successMessage", successMessage);
+            }
+
+            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
+            String errorMessage = req.queryParams("error");
+            if (errorMessage != null && !errorMessage.isEmpty()) {
+                model.put("errorMessage", errorMessage);
+            }
+
+            model.put("tituloPagina", "Alta de carrera");
+
+            // Renderiza la plantilla 'career_form.mustache' con los datos del modelo.
+            return new ModelAndView(model, "career_form.mustache");
+        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
+
+
+        get("/plan/update",(req, res) -> { 
+            List<Plan> plans = Plan.findAll().include(Career.class);
+
+            Map<String, Object> model = Map.of(
+                "plans", plans,
+                "tituloPagina", "Modificación de plan",
+                "errorMessage", req.queryParamOrDefault("errorMessage", ""),
+                "successMessage", req.queryParamOrDefault("successMessage", "")
+            );
+            return new ModelAndView(model, "plan_update.mustache");
+
+        }, new MustacheTemplateEngine());
+
+        get("/student/delete", (req, res) -> {
+            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
+
+            // Obtener y añadir mensaje de éxito de los query parameters
+            String successMessage = req.queryParams("message");
+            if (successMessage != null && !successMessage.isEmpty()) {
+                model.put("successMessage", successMessage);
+            }
+
+            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
+            String errorMessage = req.queryParams("error");
+            if (errorMessage != null && !errorMessage.isEmpty()) {
+                model.put("errorMessage", errorMessage);
+            }
+
+            // Renderiza la plantilla 'student_del.mustache' con los datos del modelo.
+            return new ModelAndView(model, "student_del.mustache");
+        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
+
+        get("/student/create", (req, res) -> {
+            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
+
+            // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Carrera agregada!)
+            String successMessage = req.queryParams("message");
+            if (successMessage != null && !successMessage.isEmpty()) {
+                model.put("successMessage", successMessage);
+            }
+
+            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
+            String errorMessage = req.queryParams("error");
+            if (errorMessage != null && !errorMessage.isEmpty()) {
+                model.put("errorMessage", errorMessage);
+            }
+
+            // Renderiza la plantilla 'career_form.mustache' con los datos del modelo.
+            return new ModelAndView(model, "student_form.mustache");
+        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
+        
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
         // POST: Maneja el envío del formulario de creación de nueva cuenta.
@@ -290,104 +361,12 @@ public class App {
             }
         });
 
-        post("/teacher/new", (req, res) -> {
-           String firstname = req.queryParams("firstname").trim();
-           String lastname = req.queryParams("lastname").trim();
-           String dniStr = req.queryParams("dni").trim();
-           String email = req.queryParams("email").trim();
-           String degree = req.queryParams("degree").trim();
-          
-          
-            // Validaciones básicas: campos no pueden ser nulos o vacíos.
-            if (firstname == null || firstname.isEmpty()
-                || lastname == null || lastname.isEmpty() || email == null || email.isEmpty()
-                || dniStr == null || dniStr.isEmpty()  || degree == null || degree.isEmpty()
-            ) {
-               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-               res.redirect("/teacher/create?error=" + errorMsg);
-               return "";
-            }
-            //Validación de nombre
-            String result = firstname.replaceAll("\\d", ""); //Quitar todos los números del firstname
-            if(result.length() != firstname.length()){ //Chequear si cambió la longitud
-                String errorMsg = URLEncoder.encode("El nombre no puede contener números.", StandardCharsets.UTF_8);
-                res.redirect("/teacher/create?error=" + errorMsg);
-                return "";
-            }
-            //Validación de apellido
-            result = lastname.replaceAll("\\d", ""); //Quitar todos los números del lastname
-            if(result.length() != lastname.length()){ //Chequear si cambió la longitud
-                String errorMsg = URLEncoder.encode("El apellido no puede contener números.", StandardCharsets.UTF_8);
-                res.redirect("/teacher/create?error=" + errorMsg);
-                return "";
-            }
-            //Validación de mail
-            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
-            if(!email.matches(emailRegex)) {
-                String errorMsg = URLEncoder.encode("Ingrese un correo electrónico válido (ej: usuario@dominio.com).", StandardCharsets.UTF_8);
-                res.redirect("/teacher/create?error=" + errorMsg);
-                return "";
-            }
-            //Validación de DNI
-            Integer dni = 0;
-            try {
-                dni = Integer.parseInt(dniStr);
-                if (dni <= 0) throw new IllegalArgumentException("DNI inválido");
-            } catch (Exception e) {
-                res.status(400);
-                String errorMsg = URLEncoder.encode("El DNI debe ser un número válido.", StandardCharsets.UTF_8);
-                res.redirect("/teacher/create?error=" + errorMsg);
-                return "";
-            }
-
-            //Principal
-            try {
-               //Chequear si existe una persona con el mismo DNI o gmail. Si no, crearla.
-               //Chequear si esa persona ya está registrada como profesor.
-               //Si es así, denegar la solicitud. Sino, registrarla como profesor.
-
-
-               // Intenta crear y guardar la nueva cuenta en la base de datos.
-            
-               Base.openTransaction();  // Iniciamos la transaccion
-
-               Person p = new Person(); // Crea una nueva instancia del modelo Person.
-               p.set("first_name", firstname);
-               p.set("last_name", lastname);
-               p.set("dni", dni);
-               p.saveIt();
-            
-               Teacher ac = new Teacher(); // Crea una nueva instancia del modelo Teacher.
-
-               ac.set("person_id", p.getID());
-               ac.set("degree", degree);
-               ac.set("email", email);
-               ac.saveIt();
-
-               Base.commitTransaction();               
-
-               res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
-               // Redirige al formulario de creación con un mensaje de éxito.
-               String successMsg = URLEncoder.encode("Profesor "+firstname+" "+lastname+" registrado correctamente.",StandardCharsets.UTF_8);
-               res.redirect("/teacher/create?message= " + successMsg);
-               return ""; // Retorna una cadena vacía.
-
-
-           } catch (Exception e) {
-               // Si ocurre cualquier error durante la operación de DB (ej. nombre de usuario duplicado),
-               // se captura aquí y se redirige con un mensaje de error.
-               Base.rollbackTransaction(); // Si falla algo deshace
-               e.printStackTrace(); // Imprime el stack trace para depuración.
-               res.status(500); // Código de estado HTTP 500 (Internal Server Error).
-               String errorMsg = URLEncoder.encode("ERROR: DNI ya existente o error interno.", StandardCharsets.UTF_8);
-               res.redirect("/teacher/create?error="+errorMsg);
-               return ""; // Retorna una cadena vacía. // Retorna una cadena vacía.
-           }
-       });
+        
 
         // POST: Maneja el envío del formulario de inicio de sesión.
         post("/login", (req, res) -> {
             Map<String, Object> model = new HashMap<>(); // Modelo para la plantilla de login o dashboard.
+            model.put("tituloPagina","Iniciar Sesión");
 
             String username = req.queryParams("username");
             String plainTextPassword = req.queryParams("password");
@@ -435,6 +414,7 @@ public class App {
 
                 model.put("username", username); // Añade el nombre de usuario al modelo para el dashboard.
                 model.put("is_admin", is_adminUser);
+                model.put("tituloPagina", "Dashboard - Bienvenido");
                 // Renderiza la plantilla del dashboard tras un login exitoso.
                 return new ModelAndView(model, "dashboard.mustache");
             } else {
@@ -492,32 +472,278 @@ public class App {
             String id = req.queryParams("code"); 
             String name = req.queryParams("name");
             String respId = req.queryParams("responsible_id");
+            String planId = req.queryParams("plan_id");
 
-            System.out.println("DEBUG: Recibido code=" + id + ", Name=" + name + ", Resp=" + respId);
-
-            if (id == null || name == null || respId == null || id.isEmpty() || name.isEmpty()) {
+            if (id == null || name == null || respId == null || id.isEmpty() || name.isEmpty() || planId == null || planId.isEmpty()) {
                 res.redirect("/subject/create?error=" + URLEncoder.encode("Faltan datos obligatorios", "UTF-8"));
                 return "";
             }
 
             try {
+                Base.openTransaction();
                 Subject s = new Subject();
                 s.set("code", Integer.parseInt(id));
                 s.set("name", name);
                 s.set("responsible_id", Integer.parseInt(respId));
-                
                 if (s.saveIt()) {
-                    res.redirect("/subject/create?message=" + URLEncoder.encode("Materia '" + name + "' creada con éxitooo :D", "UTF-8"));
+                    // si se guardó la materia, la asocio al plan
+                    Plan p = Plan.findById(Integer.parseInt(planId));
+                    if (p != null) {
+                        s.add(p); // acá ActiveJDBC hace el insert a subject_belongs_plan, por el @Many2Many
+                    }
+                    Base.commitTransaction();
+                    res.redirect("/subject/create?successMessage=" + URLEncoder.encode("Materia '" + name + "' creada y asignada con éxito :D", "UTF-8"));
                 } else {
-                    res.redirect("/subject/create?error=" + URLEncoder.encode(":( tenemos un error de validación: " + s.errors(), "UTF-8"));
+                    Base.rollbackTransaction();
+                    res.redirect("/subject/create?errorMessage=" + URLEncoder.encode("Error de validación: " + s.errors(), "UTF-8"));
                 }
             } catch (Exception e) {
+                Base.rollbackTransaction();
                 e.printStackTrace();
-                res.redirect("/subject/create?error=" + URLEncoder.encode("Error: El ID ya existe o es inválido", "UTF-8"));
+                res.redirect("/subject/create?errorMessage=" + URLEncoder.encode("Error: El código ya existe o es inválido", "UTF-8"));
             }
             return "";
         });
 
+        post("/career/new", (req, res) -> {
+           String name = req.queryParams("name").trim();
+          
+          
+            // Validaciones básicas: campos no pueden ser nulos o vacíos.
+            if (name == null || name.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";
+            }
+
+            //Validación de nombre
+            String result = name.replaceAll("[^\\p{L}\\p{Nd}\\s]", ""); //Quita todos los caracteres especiales (que no son letras, números o espacios intermedios) del name
+            if(result.length() != name.length()){ //Chequear si cambió la longitud
+                String errorMsg = URLEncoder.encode("El nombre no puede contener caracteres especiales.", StandardCharsets.UTF_8);
+                res.redirect("/career/create?error=" + errorMsg);
+                return "";
+            }
+
+            //Principal
+            try {
+                // Intenta crear y guardar la nueva carrera en la base de datos.
+                
+                Base.openTransaction();  // Iniciamos la transaccion
+
+                Career nc = new Career(); // Crea una nueva instancia del modelo Career.
+                nc.set("name", name);
+                nc.saveIt();
+
+                Base.commitTransaction();               
+
+                res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
+                // Redirige al formulario de creación con un mensaje de éxito.
+                String successMsg = URLEncoder.encode("Carrera "+name+" registrada correctamente.",StandardCharsets.UTF_8);
+                res.redirect("/career/create?message= " + successMsg);
+                return ""; // Retorna una cadena vacía.
+
+
+           } catch (Exception e) {
+               // Si ocurre cualquier error durante la operación de DB (ej. código de carrera duplicado),
+               // se captura aquí y se redirige con un mensaje de error.
+               Base.rollbackTransaction(); // Si falla algo deshace
+               e.printStackTrace(); // Imprime el stack trace para depuración.
+               res.status(500); // Código de estado HTTP 500 (Internal Server Error).
+               String errorMsg = URLEncoder.encode("ERROR: id de carrera ya existente o error interno.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error="+errorMsg);
+               return ""; // Retorna una cadena vacía.
+           }
+        });
+
+        post("/plan/update", (req, res) -> {
+            String planId = req.queryParams("plan_id");
+            String nuevoEstado = req.queryParams("status");
+
+            System.out.println("DEBUG POST PLAN: planId=[" + planId + "] | estado=[" + nuevoEstado + "]");
+
+            if (planId == null || planId.isEmpty() || nuevoEstado == null || nuevoEstado.isEmpty()) {
+                res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("Debes seleccionar un plan y un estado", "UTF-8"));
+                return "";
+            }
+
+            try {
+                Plan p = Plan.findById(Integer.parseInt(planId));
+                if (p != null) {
+                    p.set("status", nuevoEstado);
+                    p.saveIt();
+                    res.redirect("/plan/update?successMessage=" + URLEncoder.encode("El plan fue actualizado con éxito :D", "UTF-8"));
+                } else {
+                    res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("El plan no existe", "UTF-8"));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("Error: ", "UTF-8"));
+            }
+            return "";
+        });
+
+        post("/student/remove", (req, res) -> {
+            String id = req.queryParams("id");
+
+            if(id == null || id.isEmpty()){
+                res.redirect("/student/delete?error=" + URLEncoder.encode("Faltan datos obligatorios", "UTF-8"));
+                return "";
+            }
+
+            try {
+                Base.openTransaction();
+                Student st = Student.findById(Integer.parseInt(id));
+                if(st != null && st.delete()){
+                    Base.commitTransaction();
+                    String successMsg = URLEncoder.encode("Estudiante ["+id+"] eliminado correctamente.",StandardCharsets.UTF_8);
+                    res.redirect("/student/delete?message= " + successMsg);
+                    return "";
+
+                } else {
+                    Base.rollbackTransaction();
+                    res.redirect("/student/delete?error=" + URLEncoder.encode("Error: Código inválido", "UTF-8"));
+                    return "";
+                }
+
+            } catch(Exception e){
+                Base.rollbackTransaction();
+                e.printStackTrace();
+                res.redirect("/student/delete?error=" + URLEncoder.encode("Error", "UTF-8"));
+            }
+            return "";
+        });
+        
+        post("/student/new", (req, res) -> {
+            String firstname = req.queryParams("firstname").trim();
+            String lastname = req.queryParams("lastname").trim();
+            String dniStr = req.queryParams("dni").trim();
+            String email = req.queryParams("email").trim();
+            
+            // Validaciones básicas: campos no pueden ser nulos o vacíos.
+            if (firstname == null || firstname.isEmpty()
+                || lastname == null || lastname.isEmpty() || email == null || email.isEmpty()
+                || dniStr == null || dniStr.isEmpty()
+            ) {
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/student/create?error=" + errorMsg);
+               return "";
+            }
+            //Validación de nombre
+            String result = firstname.replaceAll("\\d", ""); //Quitar todos los números del firstname
+            if(result.length() != firstname.length()){ //Chequear si cambió la longitud
+                String errorMsg = URLEncoder.encode("El nombre no puede contener números.", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return "";
+            }
+            //Validación de apellido
+            result = lastname.replaceAll("\\d", ""); //Quitar todos los números del lastname
+            if(result.length() != lastname.length()){ //Chequear si cambió la longitud
+                String errorMsg = URLEncoder.encode("El apellido no puede contener números.", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return "";
+            }
+            //Validación de mail
+            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+            if(!email.matches(emailRegex)) {
+                String errorMsg = URLEncoder.encode("Ingrese un correo electrónico válido (ej: usuario@dominio.com).", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return "";
+            }
+            //Validación de DNI
+            Integer dni = 0;
+            try {
+                dni = Integer.parseInt(dniStr);
+                if (dni <= 0) throw new IllegalArgumentException("DNI inválido");
+            } catch (Exception e) {
+                res.status(400);
+                String errorMsg = URLEncoder.encode("El DNI debe ser un número válido.", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return "";
+            }
+
+            //Principal
+            try {
+                Base.openTransaction();
+
+                Person p = Person.findFirst("dni = ?", dni);
+                if (p == null) {
+                    p = new Person(); 
+                    p.set("first_name", firstname);
+                    p.set("last_name", lastname);
+                    p.set("dni", dni);
+                    p.set("email", email);
+                    p.saveIt();
+                } else {
+                    Student existingStudent = Student.findFirst("person_id = ?", p.getId());
+                    if (existingStudent != null) {
+                        Base.rollbackTransaction();
+                        String errorMsg = URLEncoder.encode("Esta persona ya está registrada como estudiante.", StandardCharsets.UTF_8);
+                        res.redirect("/student/create?error=" + errorMsg);
+                        return "";
+                    }
+                }
+                Student ac = new Student();
+                ac.set("person_id", p.getId());
+                ac.saveIt();
+                User u = User.findFirst("name = ?", dniStr);
+                String randomPassword = PasswordGenerator.generateSecurePassword(8);
+                if (u == null) {
+                    u = new User();
+                    String hashedPassword = BCrypt.hashpw(randomPassword, BCrypt.gensalt());
+                    u.set("name", dniStr);
+                    u.set("password", hashedPassword); 
+                    u.set("person_id", p.getId());
+                    u.set("is_admin", 0);
+                    u.saveIt();
+                }
+                Base.commitTransaction();               
+                String formatted = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);\">\n" +
+                "    <div style=\"background-color: #2563eb; padding: 20px; text-align: center;\">\n" +
+                "        <h2 style=\"color: #ffffff; margin: 0;\">¡Bienvenido al Sistema de Información!</h2>\n" +
+                "    </div>\n" +
+                "    <div style=\"padding: 30px; color: #333333; background-color: #ffffff;\">\n" +
+                "        <p style=\"font-size: 16px;\">Hola <strong>" + firstname + " " + lastname + "</strong>,</p>\n" +
+                "        <p style=\"font-size: 16px; line-height: 1.5;\">Tu cuenta ha sido creada con éxito. A continuación, te dejamos tus credenciales temporales de acceso:</p>\n" +
+                "        \n" +
+                "        <div style=\"background-color: #f3f4f6; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 5px solid #2563eb;\">\n" +
+                "            <p style=\"margin: 0 0 10px 0; font-size: 16px;\"><strong>👤 Usuario (DNI):</strong> " + dniStr + "</p>\n" +
+                "            <p style=\"margin: 0; font-size: 16px;\"><strong>🔑 Contraseña:</strong> <span style=\"font-family: monospace; background: #e5e7eb; padding: 3px 8px; border-radius: 4px; font-size: 18px; letter-spacing: 1px;\">" + randomPassword + "</span></p>\n" +
+                "        </div>\n" +
+                "        \n" +
+                "        <p style=\"font-size: 14px; color: #666666; background-color: #fffbeb; padding: 10px; border-left: 4px solid #f59e0b; border-radius: 4px;\">\n" +
+                "            ⚠️ <strong>Importante:</strong> Por cuestiones de seguridad, te pedimos que ingreses al sistema y cambies esta contraseña lo antes posible.\n" +
+                "        </p>\n" +
+                "        <br>\n" +
+                "        <p style=\"font-size: 14px; color: #666666; margin-bottom: 0;\">Saludos cordiales,<br><strong>El equipo de Administración</strong></p>\n" +
+                "    </div>\n" +
+                "</div>";
+                String asunto = "Tus credenciales de acceso al sistema";
+
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        EmailSender.sendMail(email,asunto,formatted);
+                    } catch (Exception e) {
+                        System.err.println("Error enviando correo asíncrono a " + email);
+                        e.printStackTrace();
+                    }
+                });
+
+                res.status(201); 
+                String successMsgText = "Estudiante " + firstname + " " + lastname + " registrado correctamente.";
+                String successMsg = URLEncoder.encode(successMsgText, StandardCharsets.UTF_8);
+
+                res.redirect("/student/create?message=" + successMsg);
+                return "";
+
+           } catch (Exception e) {
+                Base.rollbackTransaction(); 
+                e.printStackTrace(); 
+                res.status(500); 
+                String errorMsg = URLEncoder.encode("ERROR interno al procesar el registro.", StandardCharsets.UTF_8);
+                res.redirect("/student/create?error=" + errorMsg);
+                return ""; 
+           }
+       });
 
     } // Fin del método main
 

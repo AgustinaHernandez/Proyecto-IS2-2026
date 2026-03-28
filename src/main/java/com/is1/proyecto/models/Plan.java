@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 package com.is1.proyecto.models;                                               // Controlar
 
 import org.javalite.activejdbc.Model;
@@ -6,25 +7,29 @@ import org.javalite.activejdbc.annotations.Table;
 
 @Table("plans")
 @IdName("id")
+@BelongsTo(parent = Career.class, foreignKeyName = "career_id")
 public class Plan extends Model {
 
-    public Integer getID() {
-        return getInteger("id");
-    }
+     public String getDisplayString(){
+        Career c = parent(Career.class);
+        String careerName = (c != null) ? c.getString("name"):"Carrera desconocida";
+        return careerName + " (Versión " + getString("version") + ")";
+    
+    
+=======
+package com.is1.proyecto.models;
 
-    public Integer getCareerId() {
-        return getInteger("career_id");
-    }
+import org.javalite.activejdbc.Model;
+import org.javalite.activejdbc.annotations.Table;
+import org.javalite.activejdbc.annotations.BelongsTo;
 
-    public void setCareerId(Integer careerId) {
-        set("career_id", careerId);
-    }
-
-    public Integer getVersion() {
-        return getInteger("version");
-    }
-
-    public void setVersion(Integer version) {
-        set("version", version);
+@Table("plans")
+@BelongsTo(parent = Career.class, foreignKeyName = "career_id")
+public class Plan extends Model {
+    public String getDisplayString(){
+        Career c = parent(Career.class);
+        String careerName = (c != null) ? c.getString("name"):"Carrera desconocida";
+        return careerName + " (Versión " + getString("version") + ")";
+>>>>>>> 9a5ce9f75b501df20df416fb687d7a3c0a76aeb0
     }
 }

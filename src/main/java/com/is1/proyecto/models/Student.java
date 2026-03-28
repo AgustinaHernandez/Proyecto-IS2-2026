@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 package com.is1.proyecto.models;             // Laburando
 
 import org.javalite.activejdbc.Model;
@@ -7,6 +8,16 @@ import org.javalite.activejdbc.annotations.Table;
 @Table("students") // Igual que en 'Teacher'
 @BelongsTo(parent = Person.class, foreignKeyName = "id")
 
+=======
+package com.is1.proyecto.models;
+
+import org.javalite.activejdbc.Model;
+import org.javalite.activejdbc.annotations.BelongsTo;
+import org.javalite.activejdbc.annotations.Table;
+
+@Table("students") 
+@BelongsTo(parent = Person.class, foreignKeyName = "id")
+>>>>>>> 9a5ce9f75b501df20df416fb687d7a3c0a76aeb0
 public class Student extends Model {
     
     private Person persona;
@@ -47,9 +58,21 @@ public class Student extends Model {
     public void setDNI(int dni) {
         getPerson().set("dni", dni);
     }
+<<<<<<< HEAD
     
 // Atributos propios de Student
 
     //Student no tiene atributos propios distintos de Person, no tiene sentido
+
+    public String getFullNameString() {
+        return getFirstName() + " " + getLastName();
+    }
 }
 
+=======
+
+    public String getFullNameString() {
+        return getFirstName() + " " + getLastName();
+    }
+}
+>>>>>>> 9a5ce9f75b501df20df416fb687d7a3c0a76aeb0

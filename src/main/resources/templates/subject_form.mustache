@@ -1,19 +1,5 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Alta de Materia</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = { darkMode: 'class' }; 
-    
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            document.documentElement.classList.add('dark')
-        } else {
-            document.documentElement.classList.remove('dark')
-        }
-    </script>
-</head>
+{{> header}}
+
 <body class="bg-gray-100 dark:bg-gray-900 flex items-center justify-center min-h-screen p-4 transition-colors duration-300">
     
     <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md border border-gray-200 dark:border-gray-700">
@@ -40,18 +26,28 @@
             </div>
 
             <div>
-                <label for="code" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">codigo de la Materia:</label>
+                <label for="code" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Código de la Materia:</label>
                 <input type="number" id="code" name="code" placeholder="" required
                     class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
             </div>
-
-            <select id="responsible_id" name="responsible_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                <option value="" disabled selected>Seleccione un docente</option>
-                {{#teachers}}
-                <option value="{{getId}}">{{getFullNameString}}</option>
-                {{/teachers}}
-            </select>
-
+            <div>
+                <label for="responsible_id" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Docente Responsable:</label>
+                <select id="responsible_id" name="responsible_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="" disabled selected>Seleccione un docente</option>
+                    {{#teachers}}
+                    <option value="{{getId}}">{{getFullNameString}}</option>
+                    {{/teachers}}
+                </select>
+            </div>
+            <div>
+                <label for="plan_id" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Plan de Estudio:</label>
+                <select id="plan_id" name="plan_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="" disabled selected>Seleccione un plan de estudio</option>
+                    {{#plans}}
+                    <option value="{{getId}}">{{getDisplayString}}</option>
+                    {{/plans}}
+                </select>
+            </div>
             <button type="submit"
                     class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200">
                 Crear Materia

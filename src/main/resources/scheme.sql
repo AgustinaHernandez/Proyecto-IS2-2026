@@ -4,9 +4,12 @@ DROP TABLE IF EXISTS users;
 -- Crea la tabla 'users' con los campos originales, adaptados para SQLite
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- Clave primaria autoincremental para SQLite
+    person_id INTEGER NOT NULL,
     name TEXT NOT NULL UNIQUE,          -- Nombre de usuario (TEXT es el tipo de cadena recomendado para SQLite), con restricción UNIQUE
     password TEXT NOT NULL,           -- Contraseña hasheada (TEXT es el tipo de cadena recomendado para SQLite)
-    is_admin INTEGER NOT NULL DEFAULT 0
+    is_admin INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT fk_id_person FOREIGN KEY (person_id) REFERENCES persons (id)
 );
 
 DROP TABLE IF EXISTS persons;
@@ -16,7 +19,8 @@ CREATE TABLE persons (
     id INTEGER NOT NULL PRIMARY KEY,
     dni INTEGER NOT NULL UNIQUE,
     first_name TEXT NOT NULL,
-    last_name TEXT NOT NULL
+    last_name TEXT NOT NULL,
+    email TEXT
 );
 
 DROP TABLE IF EXISTS teachers;
@@ -26,7 +30,6 @@ CREATE TABLE teachers (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     person_id INTEGER NOT NULL,
     degree TEXT NOT NULL,
-    email TEXT NOT NULL,
 
     CONSTRAINT valid_degree CHECK (
         degree IN (
@@ -55,7 +58,7 @@ CREATE TABLE students (
 DROP TABLE IF EXISTS careers;
 
 CREATE TABLE careers (
-    id INTEGER NOT NULL PRIMARY KEY,
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     name VARCHAR(25)
 
 );
@@ -65,8 +68,16 @@ DROP TABLE IF EXISTS plans;
 CREATE TABLE plans (
     id INTEGER NOT NULL PRIMARY KEY,
     career_id INTEGER NOT NULL,
+    state VARCHAR(25),
     version INTEGER NOT NULL,
-    
+
+    CONSTRAINT plan_states CHECK (
+        state IN (
+            'SUSPENDIDO',
+            'A TERMINO',
+            'VIGENTE'
+        )
+    ),
     CONSTRAINT fk_career FOREIGN KEY (career_id) REFERENCES careers (id)
 );
 
@@ -124,3 +135,4 @@ CREATE TABLE enrolled_plan(
     CONSTRAINT fk_plan FOREIGN KEY (plan_id) REFERENCES plans (id),
     CONSTRAINT pk_enrolled_plan PRIMARY KEY (student_id, plan_id)
 );
+

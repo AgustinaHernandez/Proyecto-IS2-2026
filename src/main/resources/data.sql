@@ -1,47 +1,38 @@
 --- Inserts para pruebas manuales ------------------------------------------------
 
--- limpiar datos
+DELETE FROM teaches;
+DELETE FROM subjects;
 DELETE FROM teachers;
 DELETE FROM users;
 DELETE FROM persons;
-DELETE FROM persons;
 
--- Insertar Personas
-INSERT INTO persons (dni, first_name, last_name) VALUES 
-(10000000, 'Admin', 'Admin'),
-(11111111, 'Fran', 'P'),
-(22222222, 'Agus', 'H'),
-(33333333, 'Adrian', 'B'),
-(44444444, 'Jose', 'M'),
-(55555555, 'Hose', 'Ignacion Mendez'),
-(66666666, 'Santiago', 'Hernandez'),
-(77777777, 'Francisco', 'Franco P');
+INSERT INTO persons (dni, first_name, last_name, email) VALUES 
+(10000000, 'Admin', 'Admin', 'admin@admin.com'),
+(11111111, 'Fran', 'P', 'fran@test.com'),
+(22222222, 'Agus', 'H', 'agus@test.com'),
+(33333333, 'Adrian', 'B', 'adrian@test.com'),
+(44444444, 'Jose', 'M', 'jose@test.com'),
+(55555555, 'Hose', 'Ignacion Mendez', 'hose@test.com'),
+(66666666, 'Santiago', 'Hernandez', 'santiago@test.com'),
+(77777777, 'Francisco', 'Franco P', 'francisco@test.com');
 
--- Insertar Usuarios de login
-    -- Todos con contraseña hasehada "admin"
-INSERT INTO users (name, password, is_admin) VALUES 
-('admin', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 1),
-('fran', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
-('agus', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 1),
-('adrian', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
-('jose', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
-('hose', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
-('santiago', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
-('francisco', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0);
+INSERT INTO users (person_id, name, password, is_admin) VALUES 
+(1, 'admin', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 1),
+(2, 'fran', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
+(3, 'agus', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 1),
+(4, 'adrian', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
+(5, 'jose', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
+(6, 'hose', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
+(7, 'santiago', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0),
+(8, 'francisco', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0);
 
 
--- Insertar profesores
-INSERT INTO teachers (person_id, degree, email) 
-VALUES (2, 'LICENCIATURA', 'fran@cs.com');
-
-INSERT INTO teachers (person_id, degree, email) 
-VALUES (6, 'LICENCIATURA', 'hose@cs.com');
-
-INSERT INTO teachers (person_id, degree, email) 
-VALUES (7, 'LICENCIATURA', 'santiago@cs.com');
+INSERT INTO teachers (person_id, degree) VALUES 
+(2, 'LICENCIATURA'),
+(6, 'LICENCIATURA'),
+(7, 'LICENCIATURA');
 
 
--- INsertar materias
 INSERT INTO subjects (code, name, responsible_id) VALUES 
 (101, 'Programación I', 1),
 (102, 'Ingeniería de Software I', 3),
