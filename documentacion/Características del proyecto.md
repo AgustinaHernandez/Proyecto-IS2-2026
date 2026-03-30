@@ -1,12 +1,8 @@
-## Características del proyecto
+## Especificación del Proyecto (Requirements)
 
 #### Problema que se quiere resolver:
 
-La institución no tiene un sistema informático unificado para almacenar y modificar información de las personas que la conforman, tal como datos personales, contacto,
-
-condición o cargo, materias asociadas; ni para llevar registro de actividades, tal como inscripciones a materias y exámenes finales (y sus requisitos), y demás tareas
-
-administrativas.
+La institución no tiene un sistema informático unificado para almacenar y modificar información de las personas que la conforman, tal como datos personales, contacto, condición o cargo, materias asociadas; ni para llevar registro de actividades, tal como inscripciones a materias y exámenes finales (y sus requisitos), y demás tareas administrativas.
 
 
 
@@ -92,7 +88,7 @@ Hasta junio de 2026.
 #### Problemas encontrados:
 
 * Curva de aprendizaje alta para empezar a manejar parcialmente todas las herramientas necesarias.
-* Dificultades con GitHub, lo que a su vez complicó el reparto de tareas en ciertas situaciones.
+* Dificultades con git, lo que a su vez complicó el reparto de tareas en ciertas situaciones.
 * Es nuestro primer proyecto grupal en la carrera, por lo que estamos en un proceso continuo de aprendizaje y prueba-error.
 * Empezamos a notar que el sistema tenía un alto nivel de acoplamiento, por lo que tuvimos que refactorizar.
 
@@ -102,3 +98,50 @@ Hasta junio de 2026.
 
 Hacemos reuniones virtuales o presenciales de organización y división de tareas, luego cada uno implementa la tarea que le tocó, y si surgen dudas, nos comunicamos.
 
+
+<br>
+
+## (Auditoría) Análisis de Riesgos
+
+### a) Riesgos identificados por la IA (LLM)
+> **Nota:** Los riesgos extraídos del análisis de Gemini fueron clasificados según la estructura de auditoría solicitada.
+
+| Identificado | Tipo de Riesgo | Descripción | Probabilidad | Impacto |
+| :--- | :--- | :--- | :--- | :--- |
+| **R1** | Técnico | Bloqueos en SQLite por concurrencia de datos durante picos de uso (ej. inscripciones). | Alta | Crítico |
+| **R2** | Técnico | Fallos lógicos complejos en el motor de validación de correlatividades (regresión de código). | Media | Alto |
+| **R3** | Técnico | Fugas de recursos y caída del sistema por mal cierre de transacciones en Spark/ActiveJDBC. | Baja | Crítico |
+| **R4** | Planificación | Desvío del alcance por subestimar la complejidad de la herramienta de seguimiento analítico. | Alta | Alto |
+| **R5** | Organizacional | Conflictos y cuellos de botella por alto acoplamiento y dependencias entre tareas del equipo. | Media | Alto |
+| **R6** | Técnico | Degradación de la UI por latencia al enviar notificaciones SMTP de forma sincrónica. | Media | Medio |
+| **R7** | Organizacional | Resistencia al cambio del personal administrativo hacia el nuevo sistema integral. | Media | Alto |
+
+### b) Riesgos identificados por el Equipo
+> **Nota:** Clasificados e interpretados a partir del borrador original del equipo.
+
+| Identificado | Tipo de Riesgo | Descripción | Probabilidad | Impacto |
+| :--- | :--- | :--- | :--- | :--- |
+| **E1** | Planificación | Curva alta de aprendizaje tecnológico que retrasa las entregas. | Alta | Alto |
+| **E2** | Humano | Abandono del proyecto por parte de uno o más integrantes del grupo. | Baja | Crítico |
+| **E3** | Técnico | Problemas de integración de versiones y pérdida de código por inexperiencia con GitHub. | Alta | Medio |
+| **E4** | Organizacional | Desconocimiento profundo de los procesos y reglas de negocio reales de una universidad. | Media | Alto |
+| **E5** | Técnico | Incompatibilidad del sistema con los equipos de hardware o servidores finales de la institución. | Baja | Medio |
+| **E6** | Organizacional | Cambios repentinos en las normativas del estado o de la universidad que requieran reestructuración. | Baja | Alto |
+| **E7** | Organizacional | Factores externos extremos (quiebra de la institución, paros docentes/administrativos). | Baja | Alto |
+
+### c) Comparación de Análisis
+
+**Riesgos que encontró la IA y el equipo no:**
+* **Limitaciones arquitectónicas específicas:** La IA identificó con precisión que SQLite es un cuello de botella grave para la alta concurrencia requerida en inscripciones.
+* **Fallas a nivel de infraestructura:** Identificó el peligro de fugas de recursos (thread pools bloqueados) si las excepciones de Spark no cierran correctamente las conexiones de base de datos.
+* **Problemas de asincronismo:** Detectó que el uso del protocolo SMTP puede generar congelamientos en la pantalla si no se maneja de forma asíncrona.
+* **Vulnerabilidades de sesión:** La IA advirtió sobre brechas de seguridad lógicas más allá de las contraseñas, como la manipulación de IDs en las URLs para ver datos de otros alumnos.
+
+**Riesgos que encontró el equipo y la IA no:**
+* **Factores humanos críticos:** El equipo contempló el riesgo real de abandono por parte de uno o más desarrolladores, algo común en entornos académicos.
+* **Factores del entorno sociopolítico:** El equipo incluyó imprevistos externos de fuerza mayor, como paros, huelgas institucionales o quiebras.
+* **Desconocimiento del dominio:** El equipo fue autocrítico al marcar como riesgo su propia falta de conocimiento sobre las reglas de negocio administrativas reales de una universidad.
+* **Incompatibilidad de Hardware:** El equipo consideró posibles cuellos de botella físicos si los servidores reales de la institución son muy antiguos.
+
+**Calidad del análisis:**
+El análisis de la IA destacó por ser altamente técnico y específico al stack elegido (advirtiendo sobre los límites de SQLite y Spark) y aportó planes de mitigación accionables (como aplicar Unit Tests o patrones DAO). Por su parte, el análisis del equipo fue mucho más holístico y realista frente al contexto social y humano, evaluando amenazas extremas (paros, abandono de integrantes y falta de know-how institucional) que un modelo de lenguaje estandarizado tiende a omitir. La combinación de ambos resulta en una matriz de riesgos sumamente robusta.
