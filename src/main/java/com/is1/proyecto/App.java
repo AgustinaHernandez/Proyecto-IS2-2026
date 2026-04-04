@@ -63,7 +63,7 @@ public class App {
             }
         });
         // Filtro de seguridad que restringe el acceso solo al admin
-        // Las rutas protegidas revisan el atributo is_admin de la sesion
+        // Las rutas protegidas revisan el atributo isAdmin de la sesion
         before("/teacher/create", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/new", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/assign", (req, res) -> checkAdminAccess(req, res));
@@ -123,7 +123,6 @@ public class App {
             // Intenta obtener el nombre de usuario y la bandera de login de la sesión.
             String currentUsername = req.session().attribute("currentUserUsername");
             Boolean loggedIn = req.session().attribute("loggedIn");
-            Boolean is_admin = (Boolean) req.session().attribute("is_admin"); 
             
             // 1. Verificar si el usuario ha iniciado sesión.
             // Si no hay un nombre de usuario en la sesión, la bandera es nula o falsa,
@@ -134,11 +133,38 @@ public class App {
                 res.redirect("/login?error=Debes iniciar sesión para acceder a esta página.");
                 return null; // Importante retornar null después de una redirección.
             }
+            
+
+            //Ver qué roles tiene y cuántos son
+            boolean isStudent = (boolean) req.session().attribute("isStudent");
+            boolean isRegularStudent = (boolean) req.session().attribute("isRegularStudent");
+            boolean isTeacher = (boolean) req.session().attribute("isTeacher");
+            boolean isAdmin = (boolean) req.session().attribute("isAdmin");
+            int roleCount = (isAdmin ? 1 : 0) + (isStudent ? 1 : 0) + (isTeacher ? 1:0);
 
             // 2. Si el usuario está logueado, añade el nombre de usuario al modelo para la plantilla.
             model.put("username", currentUsername);
-            model.put("is_admin", is_admin != null && is_admin);
-            
+
+            //Agregar rol activo
+            String activeRole = (String) req.session().attribute("activeRole");
+            if (activeRole == null) {
+                if (isAdmin) activeRole = "ADMIN";
+                else if (isTeacher) activeRole = "TEACHER";
+                else if (isStudent) activeRole = "STUDENT";
+                else activeRole = "NONE";
+                req.session().attribute("activeRole", activeRole);
+            }
+
+            //Agregar todos los roles para poder pasarlos al desplegable donde el usuario puede cambiar de rol
+            model.put("hasMultipleRoles", roleCount > 1);
+            model.put("isAdmin", isAdmin);
+            model.put("isTeacher", isTeacher);
+            model.put("isStudent", isStudent);
+            model.put("isRegularStudent", isRegularStudent);
+            model.put("activeRole",activeRole);    
+            model.put("isActiveAdmin", "ADMIN".equals(activeRole));
+            model.put("isActiveTeacher", "TEACHER".equals(activeRole));
+            model.put("isActiveStudent", "STUDENT".equals(activeRole));        
             // 3. Renderiza la plantilla del dashboard con el nombre de usuario.
             return new ModelAndView(model, "dashboard.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
@@ -342,7 +368,7 @@ public class App {
 
                 ac.set("name", name); // Asigna el nombre de usuario.
                 ac.set("password", hashedPassword); // Asigna la contraseña hasheada.
-                ac.set("is_admin", 0);
+                ac.set("isAdmin", 0);
                 ac.saveIt(); // Guarda el nuevo usuario en la tabla 'users'.
 
                 res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
@@ -397,23 +423,56 @@ public class App {
                 // Autenticación exitosa.
                 res.status(200); // OK.
 
-                Integer is_adminInt = ac.getInteger("is_admin");
-                Boolean is_adminUser = is_adminInt != null && is_adminInt == 1; 
+                Integer personId = ac.getInteger("person_id");
+                Integer isAdminInt = ac.getInteger("is_admin");
+                Boolean isAdmin = isAdminInt != null && isAdminInt == 1;
+
+                // -- Detectar roles -- 
+                Student studentModel = Student.findFirst("person_id = ?", personId);
+                boolean isStudent = studentModel != null;
+                boolean isTeacher = Teacher.findFirst("person_id = ?", personId) != null;
+                boolean isRegularStudent = false;
+                int roleCount = (isAdmin ? 1 : 0) + (isStudent ? 1 : 0) + (isTeacher ? 1:0);
+
+
+                if(isStudent){
+                    isRegularStudent = Enrolled_Plan.findFirst("student_id = ?",studentModel.getId()) != null;
+                }
 
                 // --- Gestión de Sesión ---
                 req.session(true).attribute("currentUserUsername", username); // Guarda el nombre de usuario en la sesión.
                 req.session().attribute("userId", ac.getId()); // Guarda el ID de la cuenta en la sesión (útil).
                 req.session().attribute("loggedIn", true); // Establece una bandera para indicar que el usuario está logueado.
-                req.session().attribute("is_admin", is_adminUser); 
+                // Roles
+                req.session().attribute("isAdmin", isAdmin); 
+                req.session().attribute("isTeacher", isTeacher);
+                req.session().attribute("isStudent", isStudent);
+                req.session().attribute("isRegularStudent", isRegularStudent);
+                // Asignar rol activo
+                if(isAdmin) req.session().attribute("activeRole","ADMIN");
+                else if(isTeacher) req.session().attribute("activeRole","TEACHER");
+                else if(isStudent) req.session().attribute("activeRole","STUDENT");
+                else req.session().attribute("activeRole","NONE");
 
-                System.out.println("DEBUG Login exitoso para " + username + " (Admin: " + is_adminUser + ")");
+                String activeRole = (String) req.session().attribute("activeRole");
+
+                System.out.println("DEBUG Login exitoso para " + username + " (Admin: " + isAdmin + ")");
                 
                 System.out.println("DEBUG: Login exitoso para la cuenta: " + username);
                 System.out.println("DEBUG: ID de Sesión: " + req.session().id());
 
-
                 model.put("username", username); // Añade el nombre de usuario al modelo para el dashboard.
-                model.put("is_admin", is_adminUser);
+                model.put("isAdmin", isAdmin);
+                model.put("isTeacher", isTeacher);
+                model.put("isStudent", isStudent);
+                model.put("hasMultipleRoles", roleCount > 1);
+                model.put("activeRole",activeRole);            
+
+
+                model.put("isActiveAdmin", "ADMIN".equals(activeRole));
+                model.put("isActiveTeacher", "TEACHER".equals(activeRole));
+                model.put("isActiveStudent", "STUDENT".equals(activeRole));
+
                 model.put("tituloPagina", "Dashboard - Bienvenido");
                 // Renderiza la plantilla del dashboard tras un login exitoso.
                 return new ModelAndView(model, "dashboard.mustache");
@@ -687,7 +746,8 @@ public class App {
                 ac.saveIt();
                 User u = User.findFirst("name = ?", dniStr);
                 String randomPassword = PasswordGenerator.generateSecurePassword(8);
-                if (u == null) {
+                boolean isNewUser = (u == null);
+                if (isNewUser) {
                     u = new User();
                     String hashedPassword = BCrypt.hashpw(randomPassword, BCrypt.gensalt());
                     u.set("name", dniStr);
@@ -697,36 +757,54 @@ public class App {
                     u.saveIt();
                 }
                 Base.commitTransaction();               
-                String formatted = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);\">\n" +
-                "    <div style=\"background-color: #2563eb; padding: 20px; text-align: center;\">\n" +
-                "        <h2 style=\"color: #ffffff; margin: 0;\">¡Bienvenido al Sistema de Información!</h2>\n" +
-                "    </div>\n" +
-                "    <div style=\"padding: 30px; color: #333333; background-color: #ffffff;\">\n" +
-                "        <p style=\"font-size: 16px;\">Hola <strong>" + firstname + " " + lastname + "</strong>,</p>\n" +
-                "        <p style=\"font-size: 16px; line-height: 1.5;\">Tu cuenta ha sido creada con éxito. A continuación, te dejamos tus credenciales temporales de acceso:</p>\n" +
-                "        \n" +
-                "        <div style=\"background-color: #f3f4f6; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 5px solid #2563eb;\">\n" +
-                "            <p style=\"margin: 0 0 10px 0; font-size: 16px;\"><strong>👤 Usuario (DNI):</strong> " + dniStr + "</p>\n" +
-                "            <p style=\"margin: 0; font-size: 16px;\"><strong>🔑 Contraseña:</strong> <span style=\"font-family: monospace; background: #e5e7eb; padding: 3px 8px; border-radius: 4px; font-size: 18px; letter-spacing: 1px;\">" + randomPassword + "</span></p>\n" +
-                "        </div>\n" +
-                "        \n" +
-                "        <p style=\"font-size: 14px; color: #666666; background-color: #fffbeb; padding: 10px; border-left: 4px solid #f59e0b; border-radius: 4px;\">\n" +
-                "            ⚠️ <strong>Importante:</strong> Por cuestiones de seguridad, te pedimos que ingreses al sistema y cambies esta contraseña lo antes posible.\n" +
-                "        </p>\n" +
-                "        <br>\n" +
-                "        <p style=\"font-size: 14px; color: #666666; margin-bottom: 0;\">Saludos cordiales,<br><strong>El equipo de Administración</strong></p>\n" +
-                "    </div>\n" +
-                "</div>";
-                String asunto = "Tus credenciales de acceso al sistema";
+                
+                if (isNewUser) {
+                    // El mail original con credenciales
+                    String formatted = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);\">\n" +
+                    "    <div style=\"background-color: #2563eb; padding: 20px; text-align: center;\">\n" +
+                    "        <h2 style=\"color: #ffffff; margin: 0;\">¡Bienvenido al Sistema de Información!</h2>\n" +
+                    "    </div>\n" +
+                    "    <div style=\"padding: 30px; color: #333333; background-color: #ffffff;\">\n" +
+                    "        <p style=\"font-size: 16px;\">Hola <strong>" + firstname + " " + lastname + "</strong>,</p>\n" +
+                    "        <p style=\"font-size: 16px; line-height: 1.5;\">Tu cuenta ha sido creada con éxito. A continuación, te dejamos tus credenciales temporales de acceso:</p>\n" +
+                    "        <div style=\"background-color: #f3f4f6; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 5px solid #2563eb;\">\n" +
+                    "            <p style=\"margin: 0 0 10px 0; font-size: 16px;\"><strong>👤 Usuario (DNI):</strong> " + dniStr + "</p>\n" +
+                    "            <p style=\"margin: 0; font-size: 16px;\"><strong>🔑 Contraseña:</strong> <span style=\"font-family: monospace; background: #e5e7eb; padding: 3px 8px; border-radius: 4px; font-size: 18px; letter-spacing: 1px;\">" + randomPassword + "</span></p>\n" +
+                    "        </div>\n" +
+                    "        <p style=\"font-size: 14px; color: #666666; background-color: #fffbeb; padding: 10px; border-left: 4px solid #f59e0b; border-radius: 4px;\">\n" +
+                    "            ⚠️ <strong>Importante:</strong> Por cuestiones de seguridad, te pedimos que ingreses al sistema y cambies esta contraseña lo antes posible.\n" +
+                    "        </p>\n" +
+                    "        <br>\n" +
+                    "        <p style=\"font-size: 14px; color: #666666; margin-bottom: 0;\">Saludos cordiales,<br><strong>El equipo de Administración</strong></p>\n" +
+                    "    </div>\n" +
+                    "</div>";
+                    String asunto = "Tus credenciales de acceso al sistema";
 
-                CompletableFuture.runAsync(() -> {
-                    try {
-                        EmailSender.sendMail(email,asunto,formatted);
-                    } catch (Exception e) {
-                        System.err.println("Error enviando correo asíncrono a " + email);
-                        e.printStackTrace();
-                    }
-                });
+                    CompletableFuture.runAsync(() -> {
+                        try { EmailSender.sendMail(email, asunto, formatted); } 
+                        catch (Exception e) { e.printStackTrace(); }
+                    });
+                } else {
+                    // El usuario ya existía, le avisamos que le agregaron el perfil
+                    String formattedUpdate = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;\">\n" +
+                    "    <div style=\"background-color: #10b981; padding: 20px; text-align: center;\">\n" +
+                    "        <h2 style=\"color: #ffffff; margin: 0;\">¡Nuevo perfil habilitado!</h2>\n" +
+                    "    </div>\n" +
+                    "    <div style=\"padding: 30px; color: #333333; background-color: #ffffff;\">\n" +
+                    "        <p style=\"font-size: 16px;\">Hola <strong>" + firstname + " " + lastname + "</strong>,</p>\n" +
+                    "        <p style=\"font-size: 16px; line-height: 1.5;\">Te informamos que se ha habilitado el perfil de <strong>Estudiante</strong> en tu cuenta institucional.</p>\n" +
+                    "        <p style=\"font-size: 16px; line-height: 1.5;\">Puedes seguir ingresando al sistema con tu DNI y tu contraseña habitual. Una vez dentro, podrás usar el menú desplegable para alternar entre tus perfiles.</p>\n" +
+                    "        <br>\n" +
+                    "        <p style=\"font-size: 14px; color: #666666; margin-bottom: 0;\">Saludos cordiales,<br><strong>El equipo de Administración</strong></p>\n" +
+                    "    </div>\n" +
+                    "</div>";
+                    String asuntoUpdate = "Nuevo perfil habilitado en tu cuenta";
+
+                    CompletableFuture.runAsync(() -> {
+                        try { EmailSender.sendMail(email, asuntoUpdate, formattedUpdate); } 
+                        catch (Exception e) { e.printStackTrace(); }
+                    });
+                }
 
                 res.status(201); 
                 String successMsgText = "Estudiante " + firstname + " " + lastname + " registrado correctamente.";
@@ -743,16 +821,25 @@ public class App {
                 res.redirect("/student/create?error=" + errorMsg);
                 return ""; 
            }
-       });
+        });
+        post("/set-role", (req, res) -> {
+            String selectedRole = req.queryParams("role");
+            System.out.println(selectedRole);            
+            if (selectedRole != null && !selectedRole.isEmpty()) {
+                req.session().attribute("activeRole", selectedRole);
+            }
+            res.redirect("/dashboard");
+            return "";
+        });
 
     } // Fin del método main
 
     /**
      * Filtro de verificación de acceso administrativo.
-     * Solo permite el acceso si el usuario tiene el flag 'is_admin' en true en la sesión.
+     * Solo permite el acceso si el usuario tiene el flag 'isAdmin' en true en la sesión.
      */
     private static void checkAdminAccess(spark.Request req, spark.Response res) {
-        Boolean is_admin = (Boolean) req.session().attribute("is_admin");
+        Boolean isAdmin = (Boolean) req.session().attribute("isAdmin");
         Boolean loggedIn = (Boolean) req.session().attribute("loggedIn");
         String currentUsername = req.session().attribute("currentUserUsername");
 
@@ -762,7 +849,7 @@ public class App {
             return;
         }
 
-        if (is_admin == null || !is_admin) {
+        if (isAdmin == null || !isAdmin) {
             System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
             res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo el administrador puede registrar profesores.", StandardCharsets.UTF_8));
             halt(); 

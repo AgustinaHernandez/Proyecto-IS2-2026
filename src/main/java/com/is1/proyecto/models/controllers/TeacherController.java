@@ -5,16 +5,21 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.is1.proyecto.models.Person;
 import com.is1.proyecto.models.Subject;
 import com.is1.proyecto.models.Teacher;
+import com.is1.proyecto.models.User;
+import com.is1.proyecto.utils.EmailSender;
+import com.is1.proyecto.utils.PasswordGenerator;
 
 import spark.ModelAndView;
 import spark.template.mustache.MustacheTemplateEngine;
 import static spark.Spark.*;
-import org.javalite.activejdbc.Base; 
+import org.javalite.activejdbc.Base;
+import org.mindrot.jbcrypt.BCrypt; 
 
 public class TeacherController {
     
@@ -34,93 +39,131 @@ public class TeacherController {
             return new ModelAndView(model, "teacher_form.mustache");
         }, engine);
 
-
         post("/teacher/new", (req, res) -> {
-           String firstname = req.queryParams("firstname").trim();
-           String lastname = req.queryParams("lastname").trim();
-           String dniStr = req.queryParams("dni").trim();
-           String email = req.queryParams("email").trim();
-           String degree = req.queryParams("degree").trim();
-          
-            // Validaciones básicas: campos no pueden ser nulos o vacíos.
-            if (firstname == null || firstname.isEmpty()
-                || lastname == null || lastname.isEmpty() || email == null || email.isEmpty()
-                || dniStr == null || dniStr.isEmpty()  || degree == null || degree.isEmpty()
-            ) {
-               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-               res.redirect("/teacher/create?error=" + errorMsg);
-               return "";
-            }
-            //Validación de nombre
-            String result = firstname.replaceAll("\\d", "");
-            if(result.length() != firstname.length()){
-                String errorMsg = URLEncoder.encode("El nombre no puede contener números.", StandardCharsets.UTF_8);
-                res.redirect("/teacher/create?error=" + errorMsg);
+            String firstname = req.queryParams("firstname").trim();
+            String lastname = req.queryParams("lastname").trim();
+            String dniStr = req.queryParams("dni").trim();
+            String email = req.queryParams("email").trim();
+            String degree = req.queryParams("degree").trim();
+
+            if (firstname == null || firstname.isEmpty() || lastname == null || lastname.isEmpty() || 
+                email == null || email.isEmpty() || dniStr == null || dniStr.isEmpty() || degree == null || degree.isEmpty()) {
+                res.redirect("/teacher/create?error=" + URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8));
                 return "";
             }
-            //Validación de apellido
-            result = lastname.replaceAll("\\d", "");
-            if(result.length() != lastname.length()){
-                String errorMsg = URLEncoder.encode("El apellido no puede contener números.", StandardCharsets.UTF_8);
-                res.redirect("/teacher/create?error=" + errorMsg);
+
+            // Validaciones de formato
+            if (!firstname.replaceAll("\\d", "").equals(firstname)) {
+                res.redirect("/teacher/create?error=" + URLEncoder.encode("El nombre no puede contener números.", StandardCharsets.UTF_8));
                 return "";
             }
-            //Validación de mail
-            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
-            if(!email.matches(emailRegex)) {
-                String errorMsg = URLEncoder.encode("Ingrese un correo electrónico válido (ej: usuario@dominio.com).", StandardCharsets.UTF_8);
-                res.redirect("/teacher/create?error=" + errorMsg);
+            if (!lastname.replaceAll("\\d", "").equals(lastname)) {
+                res.redirect("/teacher/create?error=" + URLEncoder.encode("El apellido no puede contener números.", StandardCharsets.UTF_8));
                 return "";
             }
-            //Validación de DNI
-            Integer dni = 0;
+            if (!email.matches("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$")) {
+                res.redirect("/teacher/create?error=" + URLEncoder.encode("Ingrese un correo electrónico válido.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            Integer dni;
             try {
                 dni = Integer.parseInt(dniStr);
-                if (dni <= 0) throw new IllegalArgumentException("DNI inválido");
+                if (dni <= 0) throw new IllegalArgumentException();
             } catch (Exception e) {
-                res.status(400);
-                String errorMsg = URLEncoder.encode("El DNI debe ser un número válido.", StandardCharsets.UTF_8);
-                res.redirect("/teacher/create?error=" + errorMsg);
+                res.redirect("/teacher/create?error=" + URLEncoder.encode("El DNI debe ser un número válido.", StandardCharsets.UTF_8));
                 return "";
             }
 
-            //Principal
             try {
-               Base.openTransaction();  // Iniciamos la transaccion
-               Person p = new Person(); // Crea una nueva instancia del modelo Person.
-               p.set("first_name", firstname);
-               p.set("last_name", lastname);
-               p.set("dni", dni);
-               p.saveIt();
-            
-               Teacher ac = new Teacher(); // Crea una nueva instancia del modelo Teacher.
+                Base.openTransaction();
+                
+                // Reaplicamos la lógica de alta de estudiante acá
+                Person p = Person.findFirst("dni = ?", dni);
+                if (p == null) {
+                    p = new Person();
+                    p.set("first_name", firstname);
+                    p.set("last_name", lastname);
+                    p.set("dni", dni);
+                    p.set("email", email);
+                    p.saveIt();
+                } else {
+                    Teacher existing = Teacher.findFirst("person_id = ?", p.getId());
+                    if (existing != null) {
+                        Base.rollbackTransaction();
+                        res.redirect("/teacher/create?error=" + URLEncoder.encode("Esta persona ya está registrada como profesor.", StandardCharsets.UTF_8));
+                        return "";
+                    }
+                    p.set("email", email); // Actualizar mail por las dudas
+                    p.saveIt();
+                }
 
-               ac.set("person_id", p.getID());
-               ac.set("degree", degree);
-               ac.set("email", email);
-               ac.saveIt();
+                Teacher t = new Teacher();
+                t.set("person_id", p.getId());
+                t.set("degree", degree);
+                t.saveIt();
 
-               Base.commitTransaction();               
+                // Solo si no tiene un usuario previamente
+                User u = User.findFirst("person_id = ?", p.getId());
+                String randomPassword = PasswordGenerator.generateSecurePassword(12);
+                boolean isNewUser = (u == null);
 
-               res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
-               // Redirige al formulario de creación con un mensaje de éxito.
-               String successMsg = URLEncoder.encode("Profesor "+firstname+" "+lastname+" registrado correctamente.",StandardCharsets.UTF_8);
-               res.redirect("/teacher/create?message= " + successMsg);
-               return ""; // Retorna una cadena vacía.
+                if (isNewUser) {
+                    u = new User();
+                    String hashedPassword = BCrypt.hashpw(randomPassword, BCrypt.gensalt());
+                    u.set("name", dniStr);
+                    u.set("password", hashedPassword);
+                    u.set("person_id", p.getId());
+                    u.set("is_admin", 0);
+                    u.saveIt();
+                }
 
+                Base.commitTransaction();
 
-           } catch (Exception e) {
-               // Si ocurre cualquier error durante la operación de DB (ej. nombre de usuario duplicado),
-               // se captura aquí y se redirige con un mensaje de error.
-               Base.rollbackTransaction(); // Si falla algo deshace
-               e.printStackTrace(); // Imprime el stack trace para depuración.
-               res.status(500); // Código de estado HTTP 500 (Internal Server Error).
-               String errorMsg = URLEncoder.encode("ERROR: DNI ya existente o error interno.", StandardCharsets.UTF_8);
-               res.redirect("/teacher/create?error="+errorMsg);
-               return ""; // Retorna una cadena vacía. // Retorna una cadena vacía.
-           }
-       });
+                final boolean finalIsNewUser = isNewUser;
+                final String finalPassword = randomPassword;
+                final String finalEmail = email;
 
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        String asunto;
+                        String cuerpoHtml;
+                        if (finalIsNewUser) {
+                            asunto = "Bienvenido al cuerpo docente - Credenciales de acceso";
+                            cuerpoHtml = "<div style='font-family: Arial; max-width: 600px; border: 1px solid #eee; border-radius: 10px; overflow: hidden;'>" +
+                                "<div style='background: #2563eb; padding: 20px; text-align: center; color: white;'><h2>¡Bienvenido, Profe!</h2></div>" +
+                                "<div style='padding: 30px;'>" +
+                                "<p>Hola <b>" + firstname + "</b>, tu cuenta docente ha sido creada.</p>" +
+                                "<div style='background: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;'>" +
+                                "<b>Usuario (DNI):</b> " + dniStr + "<br><b>Contraseña:</b> <code style='background: #ddd; padding: 2px 5px;'>" + finalPassword + "</code>" +
+                                "</div>" +
+                                "<p style='color: #666; font-size: 13px;'>Por seguridad, cambia tu clave al ingresar.</p>" +
+                                "</div></div>";
+                        } else {
+                            asunto = "Nuevo perfil habilitado: Profesor";
+                            cuerpoHtml = "<div style='font-family: Arial; max-width: 600px; border: 1px solid #eee; border-radius: 10px; overflow: hidden;'>" +
+                                "<div style='background: #10b981; padding: 20px; text-align: center; color: white;'><h2>Perfil Docente Habilitado</h2></div>" +
+                                "<div style='padding: 30px;'>" +
+                                "<p>Hola <b>" + firstname + "</b>, ahora tienes acceso al sistema como <b>Profesor</b>.</p>" +
+                                "<p>Usa tus credenciales de siempre (DNI y tu clave actual). Podrás alternar roles desde el menú superior del Dashboard.</p>" +
+                                "</div></div>";
+                        }
+                        EmailSender.sendMail(finalEmail, asunto, cuerpoHtml);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+
+                res.redirect("/teacher/create?message=" + URLEncoder.encode("Profesor " + firstname + " " + lastname + " registrado correctamente.", StandardCharsets.UTF_8));
+                return "";
+
+            } catch (Exception e) {
+                Base.rollbackTransaction();
+                e.printStackTrace();
+                res.redirect("/teacher/create?error=" + URLEncoder.encode("Error interno al procesar el alta.", StandardCharsets.UTF_8));
+                return "";
+            }
+        });
 
         /**
          *      Asignación de profesores
