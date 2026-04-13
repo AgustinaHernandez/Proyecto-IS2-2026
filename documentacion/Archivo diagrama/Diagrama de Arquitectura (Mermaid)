@@ -1,0 +1,39 @@
+flowchart TD
+    subgraph Cliente [Cliente]
+        Browser[Navegador Web]
+    end
+
+    subgraph Presentacion [Capa de Presentación - Spark/Mustache]
+        Views[Vistas .mustache]
+    end
+
+    subgraph Control [Capa de Control - Spark Java]
+        App[App.java <br> Front Controller / Enrutador]
+        TC[TeacherController.java]
+    end
+
+    subgraph Utilidades [Servicios / Utils]
+        BCrypt[BCrypt]
+        Email[EmailSender]
+        Pass[PasswordGenerator]
+    end
+
+    subgraph Modelo [Capa de Dominio - ActiveJDBC]
+        Entities[Modelos ORM<br>Person, User, Teacher...]
+    end
+
+    subgraph Persistencia [Base de Datos]
+        DBConfig[DBConfigSingleton]
+        SQLite[(SQLite dev.db)]
+    end
+
+    Browser <-->|HTTP GET/POST| App
+    App --> Views
+    App --> TC
+    TC --> Views
+    App --> Utilidades
+    TC --> Utilidades
+    App <--> Entities
+    TC <--> Entities
+    Entities <-->|JDBC| DBConfig
+    DBConfig <--> SQLite
