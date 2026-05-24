@@ -35,11 +35,11 @@ public class Person extends Model{
     }
 
     public String getMail(){
-        return getString("mail");
+        return getString("email");
     }
 
     public void setMail(String mail){
-        set("mail", mail);
+        set("email", mail);
     }
     
 }
