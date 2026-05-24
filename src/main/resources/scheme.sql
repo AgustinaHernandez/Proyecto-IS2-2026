@@ -12,6 +12,18 @@ CREATE TABLE users (
     CONSTRAINT fk_id_person FOREIGN KEY (person_id) REFERENCES persons (id)
 );
 
+DROP TABLE IF EXISTS recover_password_codes;
+
+CREATE TABLE recover_password_codes(
+    user_id INTEGER NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    creation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT pk_recover_code PRIMARY KEY (user_id, code)
+);
+
+
 DROP TABLE IF EXISTS persons;
 
 -- Creación de tabla 'persons'
@@ -135,4 +147,3 @@ CREATE TABLE enrolled_plan(
     CONSTRAINT fk_plan FOREIGN KEY (plan_id) REFERENCES plans (id),
     CONSTRAINT pk_enrolled_plan PRIMARY KEY (student_id, plan_id)
 );
-
