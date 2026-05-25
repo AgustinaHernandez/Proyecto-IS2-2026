@@ -1,5 +1,17 @@
 --- Inserts para pruebas manuales ------------------------------------------------
 
+
+DELETE FROM final_grades;
+DELETE FROM final_sheets;
+DELETE FROM statuses;
+DELETE FROM grade_sheets;
+DELETE FROM conditions;
+DELETE FROM enrolled_subject;
+DELETE FROM enrolled_plan;
+
+DELETE FROM subject_belongs_plan;
+DELETE FROM plans;
+DELETE FROM careers;
 DELETE FROM teaches;
 DELETE FROM subjects;
 DELETE FROM teachers;
@@ -37,3 +49,44 @@ INSERT INTO subjects (code, name, responsible_id) VALUES
 (101, 'Programación I', 1),
 (102, 'Ingeniería de Software I', 3),
 (103, 'Sistemas Operativos', 2);
+
+INSERT INTO careers (name) VALUES 
+('Licenciatura en Ciencias de la Computación'),
+('Profesorado en Ciencias de la Computación'),
+('Analista en Computación');
+
+INSERT INTO plans (career_id, state, version) VALUES 
+(1, 'VIGENTE', 2024),
+(2, 'SUSPENDIDO', 2018);
+
+INSERT INTO subject_belongs_plan (subject_id, plan_id) VALUES 
+(1, 1),
+(2, 1),
+(3, 1),
+(1, 2);
+
+
+INSERT INTO students (person_id) VALUES 
+(3),
+(4),
+(5);
+
+INSERT INTO enrolled_plan (student_id, plan_id) VALUES 
+(1, 1),
+(2, 1),
+(3, 1);
+
+
+INSERT INTO conditions (subject_id, prerequisite_id, course_condition, exam_condition) VALUES 
+(2, 1, 'REGULAR', 'APROBADA'),
+(3, 1, 'APROBADA', 'APROBADA');
+
+INSERT INTO grade_sheets (subject_id, student_id, year) VALUES 
+(1, 1, 2023);
+
+INSERT INTO statuses (grade_sheet_id, student_id, initial_condition, final_condition) VALUES 
+(1, 1, 'INSCRIPTO', 'APROBADO'),
+(1, 2, 'INSCRIPTO', 'REGULAR');
+
+INSERT INTO enrolled_subject (student_id, subject_id) VALUES 
+(3, 1);
