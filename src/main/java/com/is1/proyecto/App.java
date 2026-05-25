@@ -113,7 +113,29 @@ public class App {
             return new ModelAndView(model, "user_form.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
 
-        
+        //GET: Muestra el formulario de recuperación de contraseña.
+        get("/recover-password", (req, res) -> {
+
+            Map<String, Object> model = Map.of(
+                "tituloPagina", "Recuperar contraseña",
+                "errorMessage", req.queryParamOrDefault("error", ""),
+                "successMessage", req.queryParamOrDefault("message", "")
+            );
+
+            return new ModelAndView(model, "recover_password.mustache");
+        }, new MustacheTemplateEngine());
+
+        //GET: Muestra el formulario de ingreso de código y consecuente reseteo de contraseña.
+        get("/reset-password", (req, res) -> {
+
+            Map<String, Object> model = Map.of(
+                "tituloPagina", "Ingresar código",
+                "errorMessage", req.queryParamOrDefault("error", ""),
+                "successMessage", req.queryParamOrDefault("message", "")
+            );
+
+            return new ModelAndView(model, "reset_password.mustache");
+        }, new MustacheTemplateEngine());
 
         // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
         // Requiere que el usuario esté autenticado.
@@ -760,50 +782,12 @@ public class App {
                 
                 if (isNewUser) {
                     // El mail original con credenciales
-                    String formatted = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);\">\n" +
-                    "    <div style=\"background-color: #2563eb; padding: 20px; text-align: center;\">\n" +
-                    "        <h2 style=\"color: #ffffff; margin: 0;\">¡Bienvenido al Sistema de Información!</h2>\n" +
-                    "    </div>\n" +
-                    "    <div style=\"padding: 30px; color: #333333; background-color: #ffffff;\">\n" +
-                    "        <p style=\"font-size: 16px;\">Hola <strong>" + firstname + " " + lastname + "</strong>,</p>\n" +
-                    "        <p style=\"font-size: 16px; line-height: 1.5;\">Tu cuenta ha sido creada con éxito. A continuación, te dejamos tus credenciales temporales de acceso:</p>\n" +
-                    "        <div style=\"background-color: #f3f4f6; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 5px solid #2563eb;\">\n" +
-                    "            <p style=\"margin: 0 0 10px 0; font-size: 16px;\"><strong>👤 Usuario (DNI):</strong> " + dniStr + "</p>\n" +
-                    "            <p style=\"margin: 0; font-size: 16px;\"><strong>🔑 Contraseña:</strong> <span style=\"font-family: monospace; background: #e5e7eb; padding: 3px 8px; border-radius: 4px; font-size: 18px; letter-spacing: 1px;\">" + randomPassword + "</span></p>\n" +
-                    "        </div>\n" +
-                    "        <p style=\"font-size: 14px; color: #666666; background-color: #fffbeb; padding: 10px; border-left: 4px solid #f59e0b; border-radius: 4px;\">\n" +
-                    "            ⚠️ <strong>Importante:</strong> Por cuestiones de seguridad, te pedimos que ingreses al sistema y cambies esta contraseña lo antes posible.\n" +
-                    "        </p>\n" +
-                    "        <br>\n" +
-                    "        <p style=\"font-size: 14px; color: #666666; margin-bottom: 0;\">Saludos cordiales,<br><strong>El equipo de Administración</strong></p>\n" +
-                    "    </div>\n" +
-                    "</div>";
-                    String asunto = "Tus credenciales de acceso al sistema";
-
-                    CompletableFuture.runAsync(() -> {
-                        try { EmailSender.sendMail(email, asunto, formatted); } 
-                        catch (Exception e) { e.printStackTrace(); }
-                    });
+                    try { EmailSender.sendGenericAccountCreationMail(email, dniStr, firstname, lastname, randomPassword); } 
+                    catch (Exception e) { e.printStackTrace(); }
                 } else {
                     // El usuario ya existía, le avisamos que le agregaron el perfil
-                    String formattedUpdate = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;\">\n" +
-                    "    <div style=\"background-color: #10b981; padding: 20px; text-align: center;\">\n" +
-                    "        <h2 style=\"color: #ffffff; margin: 0;\">¡Nuevo perfil habilitado!</h2>\n" +
-                    "    </div>\n" +
-                    "    <div style=\"padding: 30px; color: #333333; background-color: #ffffff;\">\n" +
-                    "        <p style=\"font-size: 16px;\">Hola <strong>" + firstname + " " + lastname + "</strong>,</p>\n" +
-                    "        <p style=\"font-size: 16px; line-height: 1.5;\">Te informamos que se ha habilitado el perfil de <strong>Estudiante</strong> en tu cuenta institucional.</p>\n" +
-                    "        <p style=\"font-size: 16px; line-height: 1.5;\">Puedes seguir ingresando al sistema con tu DNI y tu contraseña habitual. Una vez dentro, podrás usar el menú desplegable para alternar entre tus perfiles.</p>\n" +
-                    "        <br>\n" +
-                    "        <p style=\"font-size: 14px; color: #666666; margin-bottom: 0;\">Saludos cordiales,<br><strong>El equipo de Administración</strong></p>\n" +
-                    "    </div>\n" +
-                    "</div>";
-                    String asuntoUpdate = "Nuevo perfil habilitado en tu cuenta";
-
-                    CompletableFuture.runAsync(() -> {
-                        try { EmailSender.sendMail(email, asuntoUpdate, formattedUpdate); } 
-                        catch (Exception e) { e.printStackTrace(); }
-                    });
+                    try { EmailSender.sendStudentRoleAddedMail(email, firstname, lastname); } 
+                    catch (Exception e) { e.printStackTrace(); }
                 }
 
                 res.status(201); 
@@ -822,6 +806,7 @@ public class App {
                 return ""; 
            }
         });
+
         post("/set-role", (req, res) -> {
             String selectedRole = req.queryParams("role");
             System.out.println(selectedRole);            
@@ -830,6 +815,136 @@ public class App {
             }
             res.redirect("/dashboard");
             return "";
+        });
+
+        post("/recover-password", (req, res) -> {
+            String email = req.queryParams("email");
+
+            //Validación básica, el campo mail no puede ser nulo o vacío.
+            if (email == null || email.isEmpty()) {
+               String errorMsg = URLEncoder.encode("Por favor, ingrese su correo electrónico.", StandardCharsets.UTF_8);
+               res.redirect("/recover-password?error=" + errorMsg);
+               return "";
+            }
+            //Validación de mail
+            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+            if(!email.matches(emailRegex)) {
+                String errorMsg = URLEncoder.encode("Ingrese un correo electrónico válido (ej: usuario@dominio.com).", StandardCharsets.UTF_8);
+                res.redirect("/recover-password?error=" + errorMsg);
+                return "";
+            }
+
+            System.out.println("Recuperando contraseña: " + email);            
+            
+            //Buscar a la persona por email en la tabla persons
+            Person person = Person.findFirst("email = ?", email);
+            //Si la persona no existe, lo ignoramos
+            if (person != null) {
+                //Buscar al usuario vinculado a esa persona
+                User user = User.findFirst("person_id = ?", person.getId());
+                if (user != null) {
+                    //Generar código random
+                    String rawCode = String.format("%06d", new java.util.Random().nextInt(999999));
+                    //Guardar código en la DB
+                    RecoverPasswordCode recovery = new RecoverPasswordCode();
+                    recovery.set("user_id", user.getId());
+                    recovery.set("code", rawCode);
+                    recovery.saveIt();
+                    //Enviar el mail de forma asíncrona
+                    try {
+                        EmailSender.sendRecoveryMail(email,rawCode);
+                        System.out.println("Correo enviado a: " + email + " con código: " + rawCode);
+                    } catch (Exception e) {
+                        System.err.println("Error al enviar el correo:");
+                        e.printStackTrace();
+                    }
+                }
+            }
+            //Se redirecciona siempre, incluso si no existía el mail, por cuestiones de seguridad
+            res.redirect("/reset-password");
+            return "";
+        });
+
+        post("/reset-password", (req, res) -> {
+            String token = req.queryParams("token");
+            String newPassword = req.queryParams("newPassword");
+            String confirmPassword = req.queryParams("confirmPassword");
+
+            //Validación de campos obligatorios
+            if (token == null || token.isEmpty() || newPassword == null || newPassword.isEmpty() || confirmPassword == null || confirmPassword.isEmpty()) {
+                String errorMsg = URLEncoder.encode("Todos los campos son obligatorios.", StandardCharsets.UTF_8);
+                res.redirect("/reset-password?error=" + errorMsg);
+                return "";
+            }
+
+            //Validación de coincidencia de contraseñas
+            if (!newPassword.equals(confirmPassword)) {
+                String errorMsg = URLEncoder.encode("Las contraseñas no coinciden.", StandardCharsets.UTF_8);
+                res.redirect("/reset-password?error=" + errorMsg);
+                return "";
+            }
+
+            //Buscar el código en la DB
+            RecoverPasswordCode recoveryRecord = RecoverPasswordCode.findFirst("code = ?", token);
+
+            if (recoveryRecord == null) {
+                String errorMsg = URLEncoder.encode("El código de verificación ingresado es incorrecto.", StandardCharsets.UTF_8);
+                res.redirect("/reset-password?error=" + errorMsg);
+                return "";
+            }
+
+            //Verificación de expiración del código (el límite es de 15 minutos)
+            java.sql.Timestamp creationTime = recoveryRecord.getTimestamp("creation_time");
+            long diferenciaMilisegundos = System.currentTimeMillis() - creationTime.getTime();
+            long quinceMinutosEnMilisegundos = 15 * 60 * 1000;
+
+            if (diferenciaMilisegundos > quinceMinutosEnMilisegundos) {
+                recoveryRecord.delete(); // Eliminar el código expirado
+                String errorMsg = URLEncoder.encode("El código expiró. Por favor, solicitá uno nuevo.", StandardCharsets.UTF_8);
+                res.redirect("/recover-password?error=" + errorMsg);
+                return "";
+            }
+
+            //Buscar el usuario asociado al código de recuperación
+            Object userId = recoveryRecord.get("user_id");
+            User user = User.findById(userId);
+
+            if (user == null) {
+                String errorMsg = URLEncoder.encode("No se pudo encontrar el usuario asociado.", StandardCharsets.UTF_8);
+                res.redirect("/reset-password?error=" + errorMsg);
+                return "";
+            }
+
+            //Actualización de contraseña e invalidación del token (en una transacción)
+            try {
+                String hashedPassword = org.mindrot.jbcrypt.BCrypt.hashpw(newPassword, org.mindrot.jbcrypt.BCrypt.gensalt());
+                user.set("password", hashedPassword);
+                user.saveIt();
+
+                recoveryRecord.delete();
+                
+                //Enviar mail de advertencia de contraseña cambiada
+                Object personId = user.get("person_id");
+                Person person = Person.findById(personId);
+                String email = person.getMail();
+                if (email != null && !email.isEmpty()) {
+                    EmailSender.sendPasswordChangedWarning(email);
+                }
+
+                System.out.println("Contraseña restablecida para el usuario ID: " + userId);
+                
+                String successMsg = URLEncoder.encode("Contraseña restablecida con éxito. Ya podés iniciar sesión.", StandardCharsets.UTF_8);
+                res.redirect("/?message=" + successMsg);
+
+                return "";
+
+            } catch (Exception e) {
+                System.err.println("Error al actualizar la contraseña en la base de datos:");
+                e.printStackTrace();
+                String errorMsg = URLEncoder.encode("Ocurrió un error interno al procesar el cambio.", StandardCharsets.UTF_8);
+                res.redirect("/reset-password?error=" + errorMsg);
+                return "";
+            }
         });
 
     } // Fin del método main

@@ -3,14 +3,26 @@ DROP TABLE IF EXISTS users;
 
 -- Crea la tabla 'users' con los campos originales, adaptados para SQLite
 CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Clave primaria autoincremental para SQLite
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     person_id INTEGER NOT NULL,
-    name TEXT NOT NULL UNIQUE,          -- Nombre de usuario (TEXT es el tipo de cadena recomendado para SQLite), con restricción UNIQUE
-    password TEXT NOT NULL,           -- Contraseña hasheada (TEXT es el tipo de cadena recomendado para SQLite)
+    name TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
     is_admin INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT fk_id_person FOREIGN KEY (person_id) REFERENCES persons (id)
 );
+
+DROP TABLE IF EXISTS recover_password_codes;
+
+CREATE TABLE recover_password_codes(
+    user_id INTEGER NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    creation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT pk_recover_code PRIMARY KEY (user_id, code)
+);
+
 
 DROP TABLE IF EXISTS persons;
 
