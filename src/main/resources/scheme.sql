@@ -177,7 +177,7 @@ CREATE TABLE grade_sheets (
     year INTEGER NOT NULL,
 
     CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
-    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES teachers (id)
+    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id)
 );
 
 DROP TABLE  IF EXISTS statuses;
@@ -235,6 +235,8 @@ CREATE TABLE final_grades (
 );
 
 
+DROP TABLE  IF EXISTS enrollment_register;
+
 CREATE TABLE enrollment_register (
     plan_id INTEGER NOT NULL,
     student_id INTEGER NOT NULL,
@@ -242,9 +244,10 @@ CREATE TABLE enrollment_register (
 
     CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id),
     CONSTRAINT fk_plan FOREIGN KEY (plan_id) REFERENCES plans (id),
-    CONSTRAINT pk_enrollment_register PRIMARY KEY (plan_id, student_id)
+    CONSTRAINT pk_enrollment_register PRIMARY KEY (plan_id, student_id, year)
 );
 
+DROP TABLE  IF EXISTS period_register;
 
 CREATE TABLE period_register (
     subject_id INTEGER NOT NULL,

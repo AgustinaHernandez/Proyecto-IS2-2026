@@ -2,7 +2,6 @@ package com.is1.proyecto; // Define el paquete de la aplicación, debe coincidir
 
 // Importaciones necesarias para la aplicación Spark
 import com.fasterxml.jackson.databind.ObjectMapper; // Utilidad para serializar/deserializar objetos Java a/desde JSON.
-import com.github.mustachejava.MustacheException;
 
 import static spark.Spark.*; // Importa los métodos estáticos principales de Spark (get, post, before, after, etc.).
 
@@ -20,8 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.List;
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 // Importaciones de clases del proyecto
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
@@ -380,6 +377,61 @@ public class App {
             return new ModelAndView(model, "student_form.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
         
+
+        get("/enrollment", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            
+            Object userIdAttr = req.session().attribute("userId");
+            if (userIdAttr == null) {
+                req.session().attribute("error", "Debes iniciar sesión para acceder a la inscripción.");
+                res.redirect("/login"); 
+                return null;
+            }
+            
+            String activeRole = req.session().attribute("activeRole");
+            Boolean isStudent = req.session().attribute("isStudent");
+            
+            if (!"STUDENT".equals(activeRole) || !Boolean.TRUE.equals(isStudent)) {
+                req.session().attribute("error", "Acceso denegado: Solo los usuarios con el rol de Estudiante activo pueden inscribirse.");
+                res.redirect("/dashboard"); // Te redirige a tu pantalla de bienvenida
+                return null;
+            }
+            
+            User user = User.findById(userIdAttr);
+            if (user == null) {
+                res.redirect("/login");
+                return null;
+            }
+            
+            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+            if (student == null) {
+                req.session().attribute("error", "Error interno: No se encontró un perfil de estudiante para tu cuenta.");
+                res.redirect("/dashboard");
+                return null;
+            }
+
+            List<Subject> availableSubjects = student.getAvailableSubjectsToEnroll();
+            model.put("materias", availableSubjects);
+            model.put("hasMaterias", !availableSubjects.isEmpty());
+
+            model.put("username", req.session().attribute("currentUserUsername"));
+            model.put("activeRole", activeRole);
+            model.put("isActiveStudent", true);
+
+            if (req.session().attribute("error") != null) {
+                model.put("error", req.session().attribute("error"));
+                req.session().removeAttribute("error");
+            }
+            if (req.session().attribute("success") != null) {
+                model.put("success", req.session().attribute("success"));
+                req.session().removeAttribute("success");
+            }
+
+            return new ModelAndView(model, "enrollment.mustache");
+        }, new MustacheTemplateEngine());
+
+
+
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
         // POST: Maneja el envío del formulario de creación de nueva cuenta.
@@ -958,6 +1010,69 @@ public class App {
                 res.redirect("/reset-password?error=" + errorMsg);
                 return "";
             }
+        });
+
+    post("/enrollment", (req, res) -> {
+            Object userIdAttr = req.session().attribute("userId");
+            String activeRole = req.session().attribute("activeRole");
+
+            if (userIdAttr == null || !"STUDENT".equals(activeRole)) {
+                res.redirect("/login");
+                return null;
+            }
+
+            String subjectIdParam = req.queryParams("subject_id");
+            if (subjectIdParam == null || subjectIdParam.isEmpty()) {
+                req.session().attribute("error", "Selección de materia inválida.");
+                res.redirect("/enrollment");
+                return null;
+            }
+
+            User user = User.findById(userIdAttr);
+            Student student = (user != null) ? Student.findFirst("person_id = ?", user.get("person_id")) : null;
+            Subject subject = Subject.findById(subjectIdParam);
+
+            if (student == null || subject == null) {
+                req.session().attribute("error", "Error de consistencia: Alumno o materia no encontrados.");
+                res.redirect("/enrollment");
+                return null;
+            }
+
+            List<String> errors = student.validateEnrollment(subject);
+            if (!errors.isEmpty()) {
+                req.session().attribute("error", "Inscripción rechazada: " + String.join(" ", errors));
+                res.redirect("/enrollment");
+                return null;
+            }
+
+            try {
+                Base.openTransaction();
+
+                // Buscamos el acta (grade_sheet) de cursado de la materia para el ciclo lectivo 2026
+                String gsSql = "SELECT id FROM grade_sheets WHERE subject_id = ? AND year = ? LIMIT 1";
+                Object gradeSheetId = Base.firstCell(gsSql, subject.getId(), 2026);
+
+                // Si no se abrio el acta de la materia este año, la creamos con su profesor responsable
+                if (gradeSheetId == null) {
+                    Base.exec("INSERT INTO grade_sheets (subject_id, student_id, year) VALUES (?, ?, ?)", 
+                              subject.getId(), subject.get("responsible_id"), 2026);
+                    gradeSheetId = Base.firstCell(gsSql, subject.getId(), 2026);
+                }
+
+                Base.exec("INSERT INTO statuses (grade_sheet_id, student_id, initial_condition, final_condition) VALUES (?, ?, ?, ?)", 
+                          gradeSheetId, student.getId(), "INSCRIPTO", "INSCRIPTO");
+
+                Base.commitTransaction();
+                req.session().attribute("success", "¡Te has inscripto con éxito a " + subject.getString("name") + "!");
+                
+            } catch (Exception e) {
+                Base.rollbackTransaction();
+                req.session().attribute("error", "Ocurrió un error inesperado en el servidor al procesar el alta.");
+                e.printStackTrace();
+            }
+
+            res.redirect("/enrollment");
+            return null;
         });
 
     } // Fin del método main
