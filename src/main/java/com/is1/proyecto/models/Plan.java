@@ -1,6 +1,8 @@
 
 package com.is1.proyecto.models;                                               // Controlar
 
+import java.util.List;
+
 import org.javalite.activejdbc.Model;
 import org.javalite.activejdbc.annotations.BelongsTo;
 import org.javalite.activejdbc.annotations.IdName;
@@ -16,5 +18,9 @@ public class Plan extends Model {
         String careerName = (c != null) ? c.getString("name"):"Carrera desconocida";
         return careerName + " (Versión " + getString("version") + ")";
     
+    }
+
+    public List<Subject> getSubjects() {
+        return this.getAll(Subject.class);
     }
 }

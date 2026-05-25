@@ -3,10 +3,10 @@ DROP TABLE IF EXISTS users;
 
 -- Crea la tabla 'users' con los campos originales, adaptados para SQLite
 CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Clave primaria autoincremental para SQLite
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     person_id INTEGER NOT NULL,
-    name TEXT NOT NULL UNIQUE,          -- Nombre de usuario (TEXT es el tipo de cadena recomendado para SQLite), con restricción UNIQUE
-    password TEXT NOT NULL,           -- Contraseña hasheada (TEXT es el tipo de cadena recomendado para SQLite)
+    name TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
     is_admin INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT fk_id_person FOREIGN KEY (person_id) REFERENCES persons (id)
@@ -41,6 +41,7 @@ DROP TABLE IF EXISTS teachers;
 CREATE TABLE teachers (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     person_id INTEGER NOT NULL,
+    file_code INTEGER NOT NULL,
     degree TEXT NOT NULL,
 
     CONSTRAINT valid_degree CHECK (
@@ -126,6 +127,7 @@ CREATE TABLE teaches(
     CONSTRAINT pk_teaches PRIMARY KEY (teacher_id, subject_id)
 );
 
+/*
 DROP TABLE IF EXISTS enrolled_subject;
 
 CREATE TABLE enrolled_subject(
@@ -136,6 +138,7 @@ CREATE TABLE enrolled_subject(
     CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
     CONSTRAINT pk_enrolled PRIMARY KEY (student_id, subject_id)
 );
+*/
 
 DROP TABLE  IF EXISTS enrolled_plan;
 
@@ -147,3 +150,141 @@ CREATE TABLE enrolled_plan(
     CONSTRAINT fk_plan FOREIGN KEY (plan_id) REFERENCES plans (id),
     CONSTRAINT pk_enrolled_plan PRIMARY KEY (student_id, plan_id)
 );
+
+
+DROP TABLE  IF EXISTS conditions;
+
+CREATE TABLE conditions (
+    subject_id INTEGER NOT NULL,
+    correlative_id INTEGER NOT NULL,
+    course_condition VARCHAR(25) NOT NULL, -- cond para cursar
+    exam_condition VARCHAR(25) NOT NULL,   -- cond para rendir
+
+    CONSTRAINT chk_course_cond CHECK (course_condition IN ('REGULAR', 'APROBADA')),
+    CONSTRAINT chk_exam_cond CHECK (exam_condition IN ('REGULAR', 'APROBADA')),
+    CONSTRAINT fk_subj_main FOREIGN KEY (subject_id) REFERENCES subjects (id),
+    CONSTRAINT fk_subj_prereq FOREIGN KEY (correlative_id) REFERENCES subjects (id),
+    CONSTRAINT pk_conditions PRIMARY KEY (subject_id, correlative_id)
+);
+
+
+DROP TABLE  IF EXISTS grade_sheets;
+
+CREATE TABLE grade_sheets (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    subject_id INTEGER NOT NULL,
+    student_id INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+
+    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
+    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES teachers (id)
+);
+
+DROP TABLE  IF EXISTS statuses;
+
+CREATE TABLE statuses (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    grade_sheet_id INTEGER NOT NULL,
+    student_id INTEGER NOT NULL,
+    initial_condition VARCHAR(25) NOT NULL,
+    final_condition VARCHAR(25),
+
+    CONSTRAINT chk_initial_cond CHECK (
+        initial_condition IN (
+            'INSCRIPTO', 
+            'LIBRE', 
+            'REGULAR'
+        )
+    ),
+    CONSTRAINT chk_final_cond CHECK (
+        final_condition IN (
+            'INSCRIPTO', 
+            'LIBRE', 
+            'REGULAR', 
+            'APROBADO', 
+            'ABANDONO'
+        )
+    ),
+    CONSTRAINT fk_status_gs FOREIGN KEY (grade_sheet_id) REFERENCES grade_sheets (id),
+    CONSTRAINT fk_status_student FOREIGN KEY (student_id) REFERENCES students (id)
+);
+
+DROP TABLE  IF EXISTS final_sheets;
+
+CREATE TABLE final_sheets (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    subject_id INTEGER NOT NULL,
+    year DATE NOT NULL,
+    call varchar(25) NOT NULL,
+
+    CONSTRAINT chk_call CHECK ( call IN ( 'Primero', 'Segundo', 'Tercero')),
+    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id)
+);
+
+DROP TABLE  IF EXISTS final_grades;
+
+CREATE TABLE final_grades (
+    final_sheet_id INTEGER NOT NULL,
+    student_id INTEGER NOT NULL,
+    grade INTEGER NOT NULL,
+
+    CONSTRAINT chk_grade CHECK (grade >= 1 AND grade <= 10),
+    CONSTRAINT fk_fs FOREIGN KEY (final_sheet_id) REFERENCES final_sheets (id),
+    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id),
+    CONSTRAINT pk_final_grades PRIMARY KEY (final_sheet_id, student_id)
+);
+
+
+CREATE TABLE enrollment_register (
+    plan_id INTEGER NOT NULL,
+    student_id INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+
+    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id),
+    CONSTRAINT fk_plan FOREIGN KEY (plan_id) REFERENCES plans (id),
+    CONSTRAINT pk_enrollment_register PRIMARY KEY (plan_id, student_id)
+);
+
+
+CREATE TABLE period_register (
+    subject_id INTEGER NOT NULL,
+    teacher_id INTEGER NOT NULL,
+    period varchar(25) NOT NULL,
+    position varchar(25) NOT NULL,
+    participation varchar(25) NOT NULL,
+    date DATE NOT NULL,
+
+
+    CONSTRAINT chk_period CHECK (
+        period IN (
+            '1 Cuatrimestre', 
+            '2 Cuatrimestre', 
+            '1 Cuatrimestre 1 Bimestre', 
+            '1 Cuatrimestre 2 Bimestre', 
+            '2 Cuatrimestre 1 Bimestre', 
+            '2 Cuatrimestre 2 Bimestre',
+            'Anual'
+        )
+    ),
+
+    CONSTRAINT chk_position CHECK (
+        position IN (
+            'Profesor', 
+            'JTP', 
+            'Ayudante de primera'
+        )
+    ),
+    
+    CONSTRAINT chk_participation CHECK (
+        participation IN (
+            'Responsable', 
+            'Colaborador'
+        )
+    ),
+
+    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
+    CONSTRAINT fk_teacher FOREIGN KEY (teacher_id) REFERENCES teachers (id),
+    CONSTRAINT pk_period_register PRIMARY KEY (subject_id, teacher_id)
+);
+
+
