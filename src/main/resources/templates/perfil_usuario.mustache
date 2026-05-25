@@ -9,12 +9,6 @@
 
         <!-- Caja de información: Azul claro en día, Azul oscuro transparente en noche -->
         <div class="space-y-4 mb-8 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-            
-            <div class="flex justify-between border-b border-blue-200 dark:border-blue-800 pb-2">
-                <span class="font-semibold text-gray-700 dark:text-gray-300">Nombre de Usuario:</span>
-                <span class="font-extrabold text-blue-700 dark:text-blue-400">{{username}}</span>
-            </div>
-            
             <div class="flex justify-between items-center">
                 <span class="font-semibold text-gray-700 dark:text-gray-300">ID de Cuenta:</span>
                 <!-- Badge del ID: Azul suave en día, Azul oscuro solido en noche -->
@@ -22,6 +16,33 @@
                     {{userId}}
                 </span>
             </div>
+
+            <div class="flex justify-between border-b border-blue-200 dark:border-blue-800 pb-2">
+                <span class="font-semibold text-gray-700 dark:text-gray-300">Nombre de Usuario:</span>
+                <span class="font-extrabold text-blue-700 dark:text-blue-400">{{username}}</span>
+            </div>
+
+            <div class="flex justify-between border-b border-blue-200 dark:border-blue-800 pb-2">
+                <span class="font-semibold text-gray-700 dark:text-gray-300">Nombre completo:</span>
+                <span class="font-extrabold text-blue-700 dark:text-blue-400">{{fullName}}</span>
+            </div>
+
+            <div class="flex justify-between border-b border-blue-200 dark:border-blue-800 pb-2">
+                <span class="font-semibold text-gray-700 dark:text-gray-300">DNI:</span>
+                <span class="font-extrabold text-blue-700 dark:text-blue-400">{{dni}}</span>
+            </div>
+
+            <div class="flex justify-between border-b border-blue-200 dark:border-blue-800 pb-2">
+                <span class="font-semibold text-gray-700 dark:text-gray-300">Correo electrónico:</span>
+                <span class="font-extrabold text-blue-700 dark:text-blue-400">{{email}}</span>
+            </div>
+            {{#degree}} {{! Si es null (no es un profesor, por ende degree no es "truthy"), no se renderiza}}
+                <div class="flex justify-between border-b border-blue-200 dark:border-blue-800 pb-2">
+                    <span class="font-semibold text-gray-700 dark:text-gray-300">Título:</span>
+                    <span class="font-extrabold text-blue-700 dark:text-blue-400">{{degree}}</span>
+                </div>
+            {{/degree}}
+
         </div>
         
         <div class="text-center mt-6">

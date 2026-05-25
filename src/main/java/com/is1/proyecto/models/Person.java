@@ -39,7 +39,7 @@ public class Person extends Model{
     }
 
     public void setMail(String mail){
-        set("mail", mail);
+        set("email", mail);
     }
     
 }

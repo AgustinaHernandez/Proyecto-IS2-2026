@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.List;
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 // Importaciones de clases del proyecto
@@ -246,6 +247,7 @@ public class App {
 
             Object rawUserId = req.session().attribute("userId");
             String currentUsername = req.session().attribute("currentUserUsername");
+            String role = req.session().attribute("activeRole");
             Long userId = null;
 
             if (rawUserId != null) {
@@ -269,11 +271,22 @@ public class App {
                 res.redirect("/logout");
                 return null;
             }
+            
+            Person currentPerson = Person.findById(currentUser.get("person_id"));
+            String fullName = (String) currentPerson.getLastName() + ", " + (String) currentPerson.getFirstName();
 
             model.put("userId", currentUser.getId());
             model.put("username", currentUsername); 
+            model.put("fullName", fullName);
+            model.put("dni", currentPerson.getDNI());
+            model.put("email", currentPerson.getMail());
             model.put("tituloPagina", "Perfil de Usuario");
-            
+            String degree = null;
+            if(role.equals("TEACHER")){ //Si es teacher, tiene título además de los otros datos
+                List<Teacher> teacher = Teacher.find("person_id = ?", currentPerson.getID());
+                degree = teacher.get(0).getDegree();         
+            }
+            model.put("degree", degree); //Si lo mapea como null, el formulario lo detecta y no lo muestra (ver perfil_usuario.mustache)
             return new ModelAndView(model, "perfil_usuario.mustache");
         }, new MustacheTemplateEngine());
 
@@ -390,7 +403,7 @@ public class App {
 
                 ac.set("name", name); // Asigna el nombre de usuario.
                 ac.set("password", hashedPassword); // Asigna la contraseña hasheada.
-                ac.set("isAdmin", 0);
+                ac.set("is_admin", 0);
                 ac.saveIt(); // Guarda el nuevo usuario en la tabla 'users'.
 
                 res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
