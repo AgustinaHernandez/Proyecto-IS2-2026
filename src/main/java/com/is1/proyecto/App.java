@@ -135,6 +135,33 @@ public class App {
             return new ModelAndView(model, "reset_password.mustache");
         }, new MustacheTemplateEngine());
 
+        //GET: Muestra el formulario de cambio de contraseña "voluntario" (estando logeado)
+        get("/change-password", (req, res) -> {
+            String currentUsername = req.session().attribute("currentUserUsername");
+            Boolean loggedIn = req.session().attribute("loggedIn");
+            
+            if (currentUsername == null || loggedIn == null || !loggedIn) {
+                System.out.println("DEBUG: Acceso no autorizado a /change-password. Redirigiendo a /login.");
+                res.redirect("/?error=Acceso+no+autorizado.");
+                return null;
+            }
+
+            Map<String, Object> model = new HashMap<>();
+            model.put("tituloPagina", "Cambiar contraseña");
+
+            String error = req.queryParams("error");
+            if (error != null && !error.isEmpty()) {
+                model.put("errorMessage", error);
+            }
+
+            String success = req.queryParams("success");
+            if (success != null && !success.isEmpty()) {
+                model.put("successMessage", success);
+            }
+
+            return new ModelAndView(model, "change_password.mustache");
+        }, new MustacheTemplateEngine());
+
         // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
         // Requiere que el usuario esté autenticado.
         get("/dashboard", (req, res) -> {
@@ -150,7 +177,7 @@ public class App {
             if (currentUsername == null || loggedIn == null || !loggedIn) {
                 System.out.println("DEBUG: Acceso no autorizado a /dashboard. Redirigiendo a /login.");
                 // Redirige al login con un mensaje de error.
-                res.redirect("/login?error=Debes iniciar sesión para acceder a esta página.");
+                res.redirect("/?error=Acceso no autorizado.");
                 return null; // Importante retornar null después de una redirección.
             }
             
@@ -258,7 +285,7 @@ public class App {
             }
             
             if (userId == null) {
-                res.redirect("/?error=Debes iniciar sesión para acceder a tu perfil.");
+                res.redirect("/?error=Acceso no autorizado.");
                 return null;
             }
 
@@ -383,7 +410,7 @@ public class App {
             
             Object userIdAttr = req.session().attribute("userId");
             if (userIdAttr == null) {
-                req.session().attribute("error", "Debes iniciar sesión para acceder a la inscripción.");
+                req.session().attribute("error", "Acceso no autorizado.");
                 res.redirect("/login"); 
                 return null;
             }
@@ -1012,7 +1039,72 @@ public class App {
             }
         });
 
-    post("/enrollment", (req, res) -> {
+        post("/change-password", (req, res) -> {
+            String currentPassword = req.queryParams("currentPassword");
+            String newPassword = req.queryParams("newPassword");
+            String confirmPassword = req.queryParams("confirmPassword");
+
+            //Validar que las contraseñas nuevas coincidan
+            if (newPassword == null || !newPassword.equals(confirmPassword)) {
+                String errorMsg = URLEncoder.encode("Las contraseñas nuevas no coinciden.", StandardCharsets.UTF_8);
+                res.redirect("/change-password?error=" + errorMsg);
+                return "";
+            }
+
+            try {
+                //Obtener user de la sesión
+                Integer userId = req.session().attribute("userId");
+                if (userId == null) {
+                    String errorMsg = URLEncoder.encode("La sesión expiró. Volvé a logearte.", StandardCharsets.UTF_8);
+                    res.redirect("/?error=" + errorMsg);
+                    return "";
+                }
+
+                User user = User.findById(userId);
+                if (user == null) {
+                    res.redirect("/");
+                    return "";
+                }
+
+                //Comparar el hash de la contraseña que puso el usuario con la que está en la DB
+                String currentHash = user.getString("password");
+                if (!org.mindrot.jbcrypt.BCrypt.checkpw(currentPassword, currentHash)) {
+                    String errorMsg = URLEncoder.encode("La contraseña actual es incorrecta.", StandardCharsets.UTF_8);
+                    res.redirect("/change-password?error=" + errorMsg);
+                    return "";
+                }
+
+                //Hashear la nueva contraseña y guardarla
+                String newHash = org.mindrot.jbcrypt.BCrypt.hashpw(newPassword, org.mindrot.jbcrypt.BCrypt.gensalt());
+                user.set("password", newHash);
+                user.saveIt();
+
+                //Enviar el mail de advertencia de cambio de contraseña
+                Object personId = user.get("person_id");
+                Person person = Person.findById(personId);
+                
+                if (person != null) {
+                    String email = person.getString("email");
+                    if (email != null && !email.isEmpty()) {
+                        EmailSender.sendPasswordChangedWarning(email);
+                    }
+                }
+
+                String successMsg = URLEncoder.encode("Contraseña actualizada con éxito.", StandardCharsets.UTF_8);
+                res.redirect("/change-password?success=" + successMsg);
+                return "";
+
+            } catch (Exception e) {
+                System.err.println("Error al cambiar contraseña:");
+                e.printStackTrace();
+                
+                String errorMsg = URLEncoder.encode("Ocurrió un error interno al procesar el cambio.", StandardCharsets.UTF_8);
+                res.redirect("/change-password?error=" + errorMsg);
+                return "";
+            }
+        });
+
+        post("/enrollment", (req, res) -> {
             Object userIdAttr = req.session().attribute("userId");
             String activeRole = req.session().attribute("activeRole");
 
@@ -1087,7 +1179,7 @@ public class App {
         String currentUsername = req.session().attribute("currentUserUsername");
 
         if (currentUsername == null || loggedIn == null || !loggedIn) {
-            res.redirect("/?error=" + URLEncoder.encode("Acceso restringido. Debes iniciar sesión.", StandardCharsets.UTF_8));
+            res.redirect("/?error=" + URLEncoder.encode("Acceso no autorizado.", StandardCharsets.UTF_8));
             halt(); 
             return;
         }
