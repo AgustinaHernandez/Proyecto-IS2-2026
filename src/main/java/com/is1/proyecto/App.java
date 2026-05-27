@@ -15,6 +15,7 @@ import spark.template.mustache.MustacheTemplateEngine; // Motor de plantillas Mu
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 // Importaciones estándar de Java
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.List;
@@ -44,7 +45,7 @@ public class App {
      */
     public static void main(String[] args) {
         port(8080); // Configura el puerto en el que la aplicación Spark escuchará las peticiones (por defecto es 4567).
-
+            
         // Obtener la instancia única del singleton de configuración de la base de datos.
         DBConfigSingleton dbConfig = DBConfigSingleton.getInstance();
 
@@ -61,7 +62,7 @@ public class App {
             }
         });
         // Filtro de seguridad que restringe el acceso solo al admin
-        // Las rutas protegidas revisan el atributo isAdmin de la sesion
+        // Las rutas protegidas revisan el atributo isAdmin e isStudent de la sesion
         before("/teacher/create", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/new", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/assign", (req, res) -> checkAdminAccess(req, res));
@@ -88,7 +89,6 @@ public class App {
                 System.err.println("Error al cerrar conexión con ActiveJDBC: " + e.getMessage());
             }
         });
-
 
         MustacheTemplateEngine engine = new MustacheTemplateEngine();
 
@@ -458,7 +458,15 @@ public class App {
             return new ModelAndView(model, "enrollment.mustache");
         }, new MustacheTemplateEngine());
 
+        get("/plans",(req, res) -> { 
+            Map<String, Object> model = new HashMap<>();
+            List<Plan> plans = Plan.findAll().include(Career.class);
 
+            model.put("plans", plans);
+
+            return new ModelAndView(model, "plans.mustache");
+
+        }, new MustacheTemplateEngine());
         get("/teacher/unassign", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
             
@@ -1195,6 +1203,52 @@ public class App {
             return null;
         });
 
+        post("/plans", (req, res) -> {
+            String planId = req.queryParams("plan_id");
+            Map<String, Object> model = new HashMap<>();
+            Plan plan = Plan.findById(planId);
+
+            model.put("plan", plan);
+            
+            //Materias pertenecientes al plan, sus correlativas y condiciones para cursar y rendir
+            String subjectsQuery = 
+                "SELECT s.id AS subj_id, s.code, s.name, corr.code AS correlative_code, " +
+                    "c.course_condition, c.exam_condition " +
+                "FROM subject_belongs_plan sb " +
+                "INNER JOIN subjects s ON s.id = sb.subject_id " +
+                "LEFT JOIN conditions c ON c.subject_id = sb.subject_id " +
+                "LEFT JOIN subjects corr ON c.correlative_id = corr.id " +
+                "WHERE sb.plan_id = ? " +
+                "ORDER BY s.code, corr.code"; 
+
+            List<Map> rawSubjects = Base.findAll(subjectsQuery, planId);
+
+            List<Map<String, Object>> processedSubjects = new ArrayList<>();
+            Object lastSubjectId = null;
+            Map<String, Object> previousRow = null; // Nueva variable para rastrear la fila de arriba
+
+            for (Map row : rawSubjects) {
+                Map<String, Object> newRow = new HashMap<>(row);
+                Object currentId = row.get("subj_id");
+                // Por defecto, asumo que esta fila cierra el grupo y lleva borde
+                newRow.put("has_border", true);
+                if (currentId != null && currentId.equals(lastSubjectId)) {
+                    newRow.put("code", "");
+                    newRow.put("name", "");
+                    // la fila de arriba no va a dibujar la línea inferior
+                    if (previousRow != null) {
+                        previousRow.put("has_border", false);
+                    }
+                } else {
+                    lastSubjectId = currentId;
+                }
+                processedSubjects.add(newRow);
+                previousRow = newRow; // Guarda la fila actual para la próxima vuelta
+            }
+            model.put("subjects", processedSubjects);
+
+            return new ModelAndView(model, "plan_details.mustache");
+        }, new MustacheTemplateEngine());
 
         post("/teacher/unassign", (req, res) -> {
             
@@ -1274,8 +1328,9 @@ public class App {
 
         if (isAdmin == null || !isAdmin) {
             System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
-            res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo el administrador puede registrar profesores.", StandardCharsets.UTF_8));
+            res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo el administrador puede acceder.", StandardCharsets.UTF_8));
             halt(); 
         }
     }
+
 } // Fin de la clase App
