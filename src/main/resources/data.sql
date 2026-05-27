@@ -39,10 +39,10 @@ INSERT INTO users (person_id, name, password, is_admin) VALUES
 (8, 'francisco', '$2a$10$8uG3r/WPfQn6IbwQm.d0peKotH8Wt49OaDjPcjVQplM/6TYyUiVhq', 0);
 
 
-INSERT INTO teachers (person_id, degree) VALUES 
-(2, 'LICENCIATURA'),
-(6, 'LICENCIATURA'),
-(7, 'LICENCIATURA');
+INSERT INTO teachers (person_id, file_code, degree) VALUES 
+(2, 0001, 'LICENCIATURA'),
+(6, 0002, 'LICENCIATURA'),
+(7, 0003, 'LICENCIATURA');
 
 
 INSERT INTO subjects (code, name, responsible_id) VALUES 
@@ -77,9 +77,10 @@ INSERT INTO enrolled_plan (student_id, plan_id) VALUES
 (3, 1);
 
 
-INSERT INTO conditions (subject_id, prerequisite_id, course_condition, exam_condition) VALUES 
+INSERT INTO conditions (subject_id, correlative_id, course_condition, exam_condition) VALUES 
 (2, 1, 'REGULAR', 'APROBADA'),
-(3, 1, 'APROBADA', 'APROBADA');
+(3, 1, 'APROBADA', 'APROBADA'),
+(3, 2, 'REGULAR', 'APROBADA');
 
 INSERT INTO grade_sheets (subject_id, student_id, year) VALUES 
 (1, 1, 2023);

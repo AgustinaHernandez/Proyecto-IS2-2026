@@ -127,7 +127,7 @@ CREATE TABLE teaches(
     CONSTRAINT pk_teaches PRIMARY KEY (teacher_id, subject_id)
 );
 
-/*
+
 DROP TABLE IF EXISTS enrolled_subject;
 
 CREATE TABLE enrolled_subject(
@@ -138,7 +138,6 @@ CREATE TABLE enrolled_subject(
     CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
     CONSTRAINT pk_enrolled PRIMARY KEY (student_id, subject_id)
 );
-*/
 
 DROP TABLE  IF EXISTS enrolled_plan;
 

@@ -16,7 +16,7 @@ public class Plan extends Model {
      public String getDisplayString(){
         Career c = parent(Career.class);
         String careerName = (c != null) ? c.getString("name"):"Carrera desconocida";
-        return careerName + " (Versión " + getString("version") + ")";
+        return careerName + " (Versión " + getString("version") + ")" + " (" + getString("state") + ")";
     
     }
 
