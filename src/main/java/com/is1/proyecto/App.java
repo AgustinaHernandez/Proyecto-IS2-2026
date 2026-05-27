@@ -68,6 +68,7 @@ public class App {
         before("/subject/new", (req, res) -> checkAdminAccess(req, res));
         before("/career/create", (req, res) -> checkAdminAccess(req, res));
         before("/career/new", (req, res) -> checkAdminAccess(req, res));
+        before("/teacher/unassign", (req, res) -> checkAdminAccess(req, res));
 
         // --- Filtro 'after-after' para cerrar la conexión a la base de datos pase lo que pase---
         afterAfter("/*", (req, res) -> {
@@ -457,6 +458,33 @@ public class App {
             return new ModelAndView(model, "enrollment.mustache");
         }, new MustacheTemplateEngine());
 
+
+        get("/teacher/unassign", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            
+            // Control de Seguridad (Solo ADMIN)
+            Boolean isAdmin = req.session().attribute("isAdmin");
+            if (isAdmin == null || !isAdmin) {
+                res.redirect("/dashboard?error=Acceso restringido.");
+                return null;
+            }
+
+            // Traemos las materias de la base de datos para rellenar el select del formulario
+            List<Subject> subjects = Subject.findAll();
+            model.put("subjects", subjects);
+
+
+            if (req.session().attribute("errorMessage") != null) {
+                model.put("errorMessage", req.session().attribute("errorMessage"));
+                req.session().removeAttribute("errorMessage");
+            }
+            if (req.session().attribute("successMessage") != null) {
+                model.put("successMessage", req.session().attribute("successMessage"));
+                req.session().removeAttribute("successMessage");
+            }
+
+            return new ModelAndView(model, "teacher_unassign.mustache");
+        }, new MustacheTemplateEngine());
 
 
         // --- Rutas POST para manejar envíos de formularios y APIs ---
@@ -1164,6 +1192,66 @@ public class App {
             }
 
             res.redirect("/enrollment");
+            return null;
+        });
+
+
+        post("/teacher/unassign", (req, res) -> {
+            
+            // Verificación de Seguridad (Solo ADMIN)
+            Boolean isAdmin = req.session().attribute("isAdmin");
+            if (isAdmin == null || !isAdmin) {
+                res.redirect("/dashboard");
+                return null;
+            }
+
+            String teacherIdStr = req.queryParams("teacher_id");
+            String subjectIdStr = req.queryParams("subject_id");
+
+            if (teacherIdStr == null || subjectIdStr == null || teacherIdStr.isEmpty() || subjectIdStr.isEmpty()) {
+                req.session().attribute("errorMessage", "Todos los campos son requeridos.");
+                res.redirect("/teacher/unassign");
+                return null;
+            }
+
+            try {
+                Integer teacherId = Integer.parseInt(teacherIdStr);
+                Integer subjectId = Integer.parseInt(subjectIdStr);
+
+                Subject subject = Subject.findById(subjectId);
+                if (subject == null) {
+                    req.session().attribute("errorMessage", "La materia seleccionada no existe.");
+                    res.redirect("/teacher/unassign");
+                    return null;
+                }
+
+                // Evitar desasignar al profesor responsable de la materia
+                if (subject.getInteger("responsible_id").equals(teacherId)) {
+                    req.session().attribute("errorMessage", "No puedes desasignar a este profesor porque figura como el Responsable obligatorio de la materia. Asigna a otro responsable antes de removerlo.");
+                    res.redirect("/teacher/unassign");
+                    return null;
+                }
+
+                // PROCESO DE DESASIGNACIÓN
+                Base.openTransaction();
+                
+                int rowsDeleted = Base.exec("DELETE FROM teaches WHERE teacher_id = ? AND subject_id = ?", teacherId, subjectId);
+                
+                if (rowsDeleted > 0) {
+                    Base.commitTransaction();
+                    req.session().attribute("successMessage", "El profesor ha sido desasignado exitosamente de la asignatura.");
+                } else {
+                    Base.rollbackTransaction();
+                    req.session().attribute("errorMessage", "El profesor ingresado no pertenece al equipo docente asignado a esta materia.");
+                }
+
+            } catch (Exception e) {
+                Base.rollbackTransaction();
+                e.printStackTrace();
+                req.session().attribute("errorMessage", "Ocurrió un error inesperado al procesar la desasignación.");
+            }
+
+            res.redirect("/teacher/unassign");
             return null;
         });
 
