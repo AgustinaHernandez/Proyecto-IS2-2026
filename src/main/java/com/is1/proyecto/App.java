@@ -71,6 +71,8 @@ public class App {
         before("/career/create", (req, res) -> checkAdminAccess(req, res));
         before("/career/new", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/unassign", (req, res) -> checkAdminAccess(req, res));
+        before("/grade-enrollments", (req, res) -> checkStudentAccess(req, res));
+        before("/final-enrollments", (req, res) -> checkStudentAccess(req, res));
 
         // --- Filtro 'after-after' para cerrar la conexión a la base de datos pase lo que pase---
         afterAfter("/*", (req, res) -> {
@@ -1375,6 +1377,28 @@ public class App {
         if (isAdmin == null || !isAdmin) {
             System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
             res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo el administrador puede acceder.", StandardCharsets.UTF_8));
+            halt(); 
+        }
+    }
+
+    /**
+     * Filtro de verificación de acceso a estudiantes.
+     * Solo permite el acceso si el usuario tiene el flag 'isStudent' en true en la sesión.
+     */
+    private static void checkStudentAccess(spark.Request req, spark.Response res) {
+        Boolean isStudent = (Boolean) req.session().attribute("isStudent");
+        Boolean loggedIn = (Boolean) req.session().attribute("loggedIn");
+        String currentUsername = req.session().attribute("currentUserUsername");
+
+        if (currentUsername == null || loggedIn == null || !loggedIn) {
+            res.redirect("/?error=" + URLEncoder.encode("Acceso restringido. Debes iniciar sesión.", StandardCharsets.UTF_8));
+            halt(); 
+            return;
+        }
+
+        if (isStudent == null || !isStudent) {
+            System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
+            res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo los estudiantes pueden acceder.", StandardCharsets.UTF_8));
             halt(); 
         }
     }
