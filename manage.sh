@@ -44,9 +44,9 @@ init_db() {
     if command -v sqlite3 &> /dev/null; then
         rm -f proyecto.db
         echo -e "${CIAN}[*] Generando estructura (schema.sql)...${RESET}"
-        sqlite3 proyecto.db < schema.sql
+        sqlite3 proyecto.db < src/main/resources/scheme.sql
         echo -e "${CIAN}[*] Inyectando datos iniciales (data.sql)...${RESET}"
-        sqlite3 proyecto.db < data.sql
+        sqlite3 proyecto.db < src/main/resources/data.sql
         echo -e "${VERDE}[+] Base de datos (proyecto.db) inicializada correctamente.${RESET}"
     else
         echo -e "${ROJO}[!] ERROR: La herramienta 'sqlite3' no está instalada en tu sistema.${RESET}"
