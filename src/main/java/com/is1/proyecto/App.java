@@ -766,7 +766,7 @@ public class App {
 
         post("/plan/update", (req, res) -> {
             String planId = req.queryParams("plan_id");
-            String nuevoEstado = req.queryParams("status");
+            String nuevoEstado = req.queryParams("state");
 
             System.out.println("DEBUG POST PLAN: planId=[" + planId + "] | estado=[" + nuevoEstado + "]");
 
@@ -778,7 +778,7 @@ public class App {
             try {
                 Plan p = Plan.findById(Integer.parseInt(planId));
                 if (p != null) {
-                    p.set("status", nuevoEstado);
+                    p.set("state", nuevoEstado);
                     p.saveIt();
                     res.redirect("/plan/update?successMessage=" + URLEncoder.encode("El plan fue actualizado con éxito :D", "UTF-8"));
                 } else {
