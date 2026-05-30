@@ -127,4 +127,22 @@ public class EmailSender {
 
         sendMail(receiver, title, content);
     }
+
+
+    public static void sendEmailChangeVerificationMail(String receiver, String code) {
+        String title = "Código de verificación para cambiar tu correo";
+        
+        String content = "<div style=\"font-family: Arial, sans-serif; color: #333333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 8px;\">"
+                + "<h2 style=\"color: #2563eb; margin-bottom: 20px;\">Verificación de Correo</h2>"
+                + "<p style=\"font-size: 16px; line-height: 1.5;\">Solicitaste asociar este correo electrónico a tu cuenta de la universidad.</p>"
+                + "<p style=\"font-size: 16px; line-height: 1.5;\">Ingresá el siguiente código de verificación de 6 dígitos para confirmar el cambio:</p>"
+                + "<div style=\"background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; margin: 25px 0; text-align: center;\">"
+                + "<span style=\"font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1f2937;\">" + code + "</span>"
+                + "</div>"
+                + "<p style=\"font-size: 14px; color: #6b7280; line-height: 1.5;\">Si no solicitaste este cambio, podés ignorar este correo de forma segura.</p>"
+                + "</div>";
+
+        sendMail(receiver, title, content);
+    }
+
 }
