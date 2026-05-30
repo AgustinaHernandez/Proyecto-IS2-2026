@@ -44,6 +44,7 @@ public class TeacherController {
             String lastname = req.queryParams("lastname").trim();
             String dniStr = req.queryParams("dni").trim();
             String email = req.queryParams("email").trim();
+            String fileCodeStr = req.queryParams("file_code").trim();
             String degree = req.queryParams("degree").trim();
 
             if (firstname == null || firstname.isEmpty() || lastname == null || lastname.isEmpty() || 
@@ -66,19 +67,21 @@ public class TeacherController {
                 return "";
             }
 
+            Integer fileCode;
             Integer dni;
             try {
                 dni = Integer.parseInt(dniStr);
+                fileCode = Integer.parseInt(fileCodeStr);
                 if (dni <= 0) throw new IllegalArgumentException();
+                if (fileCode <= 0) throw new IllegalArgumentException();
             } catch (Exception e) {
-                res.redirect("/teacher/create?error=" + URLEncoder.encode("El DNI debe ser un número válido.", StandardCharsets.UTF_8));
+                res.redirect("/teacher/create?error=" + URLEncoder.encode("El DNI y/o NrodeLegajo debe ser un número válido.", StandardCharsets.UTF_8));
                 return "";
             }
 
             try {
                 Base.openTransaction();
                 
-                // Reaplicamos la lógica de alta de estudiante acá
                 Person p = Person.findFirst("dni = ?", dni);
                 if (p == null) {
                     p = new Person();
@@ -101,6 +104,7 @@ public class TeacherController {
                 Teacher t = new Teacher();
                 t.set("person_id", p.getId());
                 t.set("degree", degree);
+                t.set("file_code", fileCode);
                 t.saveIt();
 
                 // Solo si no tiene un usuario previamente

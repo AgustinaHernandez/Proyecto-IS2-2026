@@ -1,0 +1,38 @@
+{{> header}}
+
+<body class="bg-gray-100 dark:bg-gray-900 flex items-center justify-center min-h-screen p-4 transition-colors duration-300">
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-md text-center border border-transparent dark:border-gray-700">
+        
+        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4">Verificá tu correo</h2>
+        
+        <p class="text-gray-600 dark:text-gray-300 mb-6">
+            Enviamos un código de 6 dígitos a <br>
+            <span class="font-semibold text-blue-600 dark:text-blue-400">{{pendingEmail}}</span>
+        </p>
+
+        {{#errorMessage}}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 text-left" role="alert">
+            <span class="block sm:inline">{{errorMessage}}</span>
+        </div>
+        {{/errorMessage}}
+
+        <form action="/profile/verify-email" method="POST" class="space-y-6">
+            <div>
+                <input type="text" name="code" required maxlength="6" pattern="\d{6}" placeholder="000000"
+                       class="text-center text-3xl tracking-widest w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <p class="text-xs text-gray-500 mt-2">Solo números</p>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300 font-semibold shadow-md">
+                    Verificar y Cambiar
+                </button>
+                <a href="/profile" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-400 transition-colors text-sm">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+
+    </div>
+</body>
+</html>
