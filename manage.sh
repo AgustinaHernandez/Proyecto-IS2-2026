@@ -58,13 +58,41 @@ run_tests() {
     mvn test
 }
 
+# ------------------------------------------------------------------------------
+# NUEVO: Descarga de credenciales
+# ------------------------------------------------------------------------------
+download_credentials() {
+    echo -e "${CIAN}[*] Solicitando credenciales al servidor seguro...${RESET}"
+    
+    # Pedir contraseña de forma silenciosa
+    read -s -p "Ingrese la clave secreta: " secret_pass
+    echo "" # Salto de línea por prolijidad
+
+    local API_URL="https://tgofdrive.duckdns.org/proyecto_is/api/get_credentials"
+    local CREDS_FILE="credentials.json"
+
+    # Ejecutamos curl de forma silenciosa
+    HTTP_STATUS=$(curl -s -w "%{http_code}" -o "$CREDS_FILE" -H "X-Secret-Pass: $secret_pass" "$API_URL")
+
+    # Evaluamos la respuesta de Nginx
+    if [ "$HTTP_STATUS" -eq 200 ]; then
+        echo -e "${VERDE}[+] ¡Éxito! Credenciales guardadas en: $(pwd)/$CREDS_FILE${RESET}"
+    elif [ "$HTTP_STATUS" -eq 403 ] || [ "$HTTP_STATUS" -eq 401 ]; then
+        echo -e "${ROJO}[!] Error: Contraseña incorrecta. Acceso denegado.${RESET}"
+        rm -f "$CREDS_FILE" # Limpiamos el archivo residual
+    else
+        echo -e "${ROJO}[!] Error inesperado del servidor. Código HTTP: $HTTP_STATUS${RESET}"
+        rm -f "$CREDS_FILE"
+    fi
+}
+
 show_help() {
     echo -e "${CIAN}"
     echo "  ___ ___ ___    ___  ___  ___       _ ___ ___ _____ "
-    echo " |_ _/ __|_  )  | _ \\| _ \\/ _ \\ _ _ | | __/ __|_   _|"
-    echo "  | |\\__ \\/ /   |  _/|   / (_) | || | | _| (__  | |  "
-    echo " |___|___/___|  |_|  |_|_\\\\___/ \\_, |_|___\\___| |_|  "
-    echo "                                |__/                 "
+    echo " |_ _/ __|_  )  | _ \| _ \/ _ \ _ _ | | __/ __|_   _|"
+    echo "  | |\__ \/ /   |  _/|   / (_) | || | | _| (__  | |  "
+    echo " |___|___/___|  |_|  |_|_\___/ \_, |_|___\___| |_|  "
+    echo "                               |__/                 "
     echo -e "${BLANCO}        SISTEMA DE GESTIÓN ACADÉMICA - CLI v1.1      ${RESET}"
     echo -e "${CIAN}=====================================================${RESET}"
     echo -e "Uso recomendado: ${AMARILLO}./proyecto.sh [comando]${RESET}"
@@ -75,6 +103,7 @@ show_help() {
     printf "  ${VERDE}%-15s${RESET} %s\n" "crun" "Compila y luego ejecuta el servidor (Build + Run)."
     printf "  ${VERDE}%-15s${RESET} %s\n" "reset_db" "Formatea y recarga la base de datos con datos de prueba."
     printf "  ${VERDE}%-15s${RESET} %s\n" "test" "Ejecuta los tests unitarios del sistema."
+    printf "  ${VERDE}%-15s${RESET} %s\n" "get_creds" "Descarga el JSON de credenciales desde el servidor."
     printf "  ${VERDE}%-15s${RESET} %s\n" "help" "Muestra este panel de ayuda."
     echo ""
 }
@@ -86,5 +115,6 @@ case "$1" in
     "crun") crun_app ;;
     "reset_db") init_db ;;
     "test") run_tests ;;
+    "get_creds") download_credentials ;;
     *) show_help ;;
 esac

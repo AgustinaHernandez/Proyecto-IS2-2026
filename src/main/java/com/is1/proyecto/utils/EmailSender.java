@@ -6,11 +6,49 @@ import java.util.concurrent.CompletableFuture;
 import javax.mail.*;
 import javax.mail.internet.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 public class EmailSender {
-    private static final String REMITENTE = "sistdeinform@gmail.com"; 
-    private static final String PASSWORD = "efwquobjmzanfgbm"; 
+    private static String remitente;
+    private static String password;
+
+    private static synchronized boolean loadCredentials() {
+        if (remitente != null && password != null) return true;
+
+        try {
+            Path path = Paths.get("credentials.json");
+            if (!Files.exists(path)) {
+                System.err.println("\n[!] ERROR: No se encontró credentials.json.");
+                System.err.println("[!] Ejecutá ./manage.sh get_creds\n");
+                return false;
+            }
+            String json = new String(Files.readAllBytes(path));
+            String cleanJson = json.replace("{", "").replace("}", "").replace("\"", "").trim();
+            for (String part : cleanJson.split(",")) {
+                String[] kv = part.split(":");
+                if (kv.length == 2) {
+                    if (kv[0].trim().equals("username")) remitente = kv[1].trim();
+                    if (kv[0].trim().equals("password")) password = kv[1].trim();
+                }
+            }
+            return (remitente != null && password != null);
+        } catch (Exception e) {
+            System.err.println("\n[!] ERROR al leer credentials.json: " + e.getMessage() + "\n");
+            return false;
+        }
+    }
 
     public static void sendMail(String receiver, String title, String content) {
+        if (!loadCredentials()) {
+            System.err.println("[!] Cancelando envío a " + receiver + ". Faltan credenciales.");
+            return; 
+        }
+
+        final String currentRemitente = remitente;
+        final String currentPassword = password;
+        
         CompletableFuture.runAsync(() -> {
             Properties props = new Properties();
             props.put("mail.smtp.auth", "true");
@@ -22,13 +60,13 @@ public class EmailSender {
             Session session = Session.getInstance(props, new Authenticator() {
                 @Override
                 protected PasswordAuthentication getPasswordAuthentication() {
-                    return new PasswordAuthentication(REMITENTE, PASSWORD);
+                    return new PasswordAuthentication(currentRemitente, currentPassword);
                 }
             });
 
             try {
                 Message message = new MimeMessage(session);
-                message.setFrom(new InternetAddress(REMITENTE));
+                message.setFrom(new InternetAddress(currentRemitente));
                 message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(receiver));
                 message.setSubject(title);
                 message.setContent(content, "text/html; charset=utf-8");
