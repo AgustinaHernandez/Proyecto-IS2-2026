@@ -370,6 +370,23 @@ public class App {
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
 
 
+        get("/plan/new",(req, res) -> { 
+            List<Plan> plans = Plan.findAll().include(Career.class);
+
+            List<Career> careers = Career.findAll(); 
+
+            Map<String, Object> model = Map.of(
+                "plans", plans,
+                "careers",careers,
+                "tituloPagina", "Nuevo plan",
+                "errorMessage", req.queryParamOrDefault("errorMessage", ""),
+                "successMessage", req.queryParamOrDefault("successMessage", "")
+            );
+            return new ModelAndView(model, "plan_new.mustache");
+
+        }, new MustacheTemplateEngine());
+
+
         get("/plan/update",(req, res) -> { 
             List<Plan> plans = Plan.findAll().include(Career.class);
 
@@ -698,6 +715,70 @@ public class App {
                return ""; // Retorna una cadena vacía.
            }
         });
+
+
+        post("/plan/new", (req, res) -> {
+                     
+            String careerId = req.queryParams("career_id"); // id de la carrera seleccionada
+            String statePlan = req.queryParams("state");   //estado del plan
+            String versionPlan = req.queryParams("version"); // version del plan
+           
+            // Validaciones básicas: campos no pueden ser nulos o vacíos.
+
+             if (careerId == null || careerId.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";
+            }
+
+             if (statePlan == null || statePlan.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";
+
+            }
+
+            if (versionPlan == null || versionPlan.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";  
+
+            }
+
+            //Principal
+            try {
+                // Intenta crear y guardar el nuevo plan de estudios  en la base de datos.
+                
+                Base.openTransaction();  // Iniciamos la transaccion
+
+                Plan np = new Plan(); // Crea una nueva instancia del modelo PLan.
+                
+                np.set("career_id",careerId);
+                np.set("state",statePlan);
+                np.set("version",versionPlan);
+                np.saveIt();
+
+                Base.commitTransaction();               
+
+                res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
+                // Redirige al formulario de creación con un mensaje de éxito.
+                String successMsg = URLEncoder.encode("Plan "+versionPlan+" registrado correctamente.",StandardCharsets.UTF_8);
+                res.redirect("/plan/new?successMessage="+successMsg);
+                return ""; // Retorna una cadena vacía.
+
+
+           } catch (Exception e) {
+               // Si ocurre cualquier error durante la operación de DB (ej. código de carrera duplicado),
+               // se captura aquí y se redirige con un mensaje de error.
+               Base.rollbackTransaction(); // Si falla algo deshace
+               e.printStackTrace(); // Imprime el stack trace para depuración.
+               res.status(500); // Código de estado HTTP 500 (Internal Server Error).
+               String errorMsg = URLEncoder.encode("ERROR: id de plan de carrera ya existente o error interno.", StandardCharsets.UTF_8);
+               res.redirect("/plan/new?errorMessage="+errorMsg);
+               return ""; // Retorna una cadena vacía.
+           }
+        });
+
 
         post("/plan/update", (req, res) -> {
             String planId = req.queryParams("plan_id");
