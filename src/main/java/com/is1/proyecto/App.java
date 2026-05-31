@@ -23,6 +23,7 @@ import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
 
 // Importaciones de clases del proyecto
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
+import com.is1.proyecto.controllers.CareerController;
 import com.is1.proyecto.models.*;
 import com.is1.proyecto.models.controllers.TeacherController;
 import com.is1.proyecto.utils.EmailSender;
@@ -96,6 +97,14 @@ public class App {
         
 
         // --- Rutas GET para renderizar formularios y páginas HTML ---
+
+
+        // Rutas refactorizadas
+        
+        // Alta de carrera
+        get("/career/create", CareerController::renderCreateForm, new MustacheTemplateEngine());
+        post("/career/new", CareerController::handleCreateCareer);
+
 
 
         //GET: Muestra el formulario de recuperación de contraseña.
@@ -227,6 +236,8 @@ public class App {
             // 3. Renderiza la plantilla del dashboard con el nombre de usuario.
             return new ModelAndView(model, "dashboard.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
+        
+        
         // GET: Página de configuración
         get("/settings", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
@@ -348,26 +359,23 @@ public class App {
             return new ModelAndView(model, "subject_form.mustache");
         }, new MustacheTemplateEngine());
 
-        get("/career/create", (req, res) -> {
-            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
 
-            // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Carrera agregada!)
-            String successMessage = req.queryParams("message");
-            if (successMessage != null && !successMessage.isEmpty()) {
-                model.put("successMessage", successMessage);
-            }
 
-            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
-            String errorMessage = req.queryParams("error");
-            if (errorMessage != null && !errorMessage.isEmpty()) {
-                model.put("errorMessage", errorMessage);
-            }
+        get("/plan/new",(req, res) -> { 
+            List<Plan> plans = Plan.findAll().include(Career.class);
 
-            model.put("tituloPagina", "Alta de carrera");
+            List<Career> careers = Career.findAll(); 
 
-            // Renderiza la plantilla 'career_form.mustache' con los datos del modelo.
-            return new ModelAndView(model, "career_form.mustache");
-        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
+            Map<String, Object> model = Map.of(
+                "plans", plans,
+                "careers",careers,
+                "tituloPagina", "Nuevo plan",
+                "errorMessage", req.queryParamOrDefault("errorMessage", ""),
+                "successMessage", req.queryParamOrDefault("successMessage", "")
+            );
+            return new ModelAndView(model, "plan_new.mustache");
+
+        }, new MustacheTemplateEngine());
 
 
         get("/plan/update",(req, res) -> { 
@@ -649,41 +657,55 @@ public class App {
             return "";
         });
 
-        post("/career/new", (req, res) -> {
-           String name = req.queryParams("name").trim();
-          
-          
+        
+
+        post("/plan/new", (req, res) -> {
+                     
+            String careerId = req.queryParams("career_id"); // id de la carrera seleccionada
+            String statePlan = req.queryParams("state");   //estado del plan
+            String versionPlan = req.queryParams("version"); // version del plan
+           
             // Validaciones básicas: campos no pueden ser nulos o vacíos.
-            if (name == null || name.isEmpty()){
+
+             if (careerId == null || careerId.isEmpty()){
                String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
                res.redirect("/career/create?error=" + errorMsg);
                return "";
             }
 
-            //Validación de nombre
-            String result = name.replaceAll("[^\\p{L}\\p{Nd}\\s]", ""); //Quita todos los caracteres especiales (que no son letras, números o espacios intermedios) del name
-            if(result.length() != name.length()){ //Chequear si cambió la longitud
-                String errorMsg = URLEncoder.encode("El nombre no puede contener caracteres especiales.", StandardCharsets.UTF_8);
-                res.redirect("/career/create?error=" + errorMsg);
-                return "";
+             if (statePlan == null || statePlan.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";
+
+            }
+
+            if (versionPlan == null || versionPlan.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";  
+
             }
 
             //Principal
             try {
-                // Intenta crear y guardar la nueva carrera en la base de datos.
+                // Intenta crear y guardar el nuevo plan de estudios  en la base de datos.
                 
                 Base.openTransaction();  // Iniciamos la transaccion
 
-                Career nc = new Career(); // Crea una nueva instancia del modelo Career.
-                nc.set("name", name);
-                nc.saveIt();
+                Plan np = new Plan(); // Crea una nueva instancia del modelo PLan.
+                
+                np.set("career_id",careerId);
+                np.set("state",statePlan);
+                np.set("version",versionPlan);
+                np.saveIt();
 
                 Base.commitTransaction();               
 
                 res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
                 // Redirige al formulario de creación con un mensaje de éxito.
-                String successMsg = URLEncoder.encode("Carrera "+name+" registrada correctamente.",StandardCharsets.UTF_8);
-                res.redirect("/career/create?message= " + successMsg);
+                String successMsg = URLEncoder.encode("Plan "+versionPlan+" registrado correctamente.",StandardCharsets.UTF_8);
+                res.redirect("/plan/new?successMessage="+successMsg);
                 return ""; // Retorna una cadena vacía.
 
 
@@ -693,11 +715,12 @@ public class App {
                Base.rollbackTransaction(); // Si falla algo deshace
                e.printStackTrace(); // Imprime el stack trace para depuración.
                res.status(500); // Código de estado HTTP 500 (Internal Server Error).
-               String errorMsg = URLEncoder.encode("ERROR: id de carrera ya existente o error interno.", StandardCharsets.UTF_8);
-               res.redirect("/career/create?error="+errorMsg);
+               String errorMsg = URLEncoder.encode("ERROR: id de plan de carrera ya existente o error interno.", StandardCharsets.UTF_8);
+               res.redirect("/plan/new?errorMessage="+errorMsg);
                return ""; // Retorna una cadena vacía.
            }
         });
+
 
         post("/plan/update", (req, res) -> {
             String planId = req.queryParams("plan_id");
