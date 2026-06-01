@@ -15,6 +15,7 @@ import spark.template.mustache.MustacheTemplateEngine; // Motor de plantillas Mu
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Year;
 import java.util.ArrayList;
 // Importaciones estándar de Java
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
@@ -70,6 +71,8 @@ public class App {
         before("/career/create", (req, res) -> checkAdminAccess(req, res));
         before("/career/new", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/unassign", (req, res) -> checkAdminAccess(req, res));
+        before("/grade-enrollments", (req, res) -> checkStudentAccess(req, res));
+        before("/final-enrollments", (req, res) -> checkStudentAccess(req, res));
 
         // --- Filtro 'after-after' para cerrar la conexión a la base de datos pase lo que pase---
         afterAfter("/*", (req, res) -> {
@@ -224,6 +227,7 @@ public class App {
             model.put("isActiveAdmin", "ADMIN".equals(activeRole));
             model.put("isActiveTeacher", "TEACHER".equals(activeRole));
             model.put("isActiveStudent", "STUDENT".equals(activeRole));        
+            model.put("hasNoRole", "NONE".equals(activeRole)); //Usado en renderización de materias en dashboard
             // 3. Renderiza la plantilla del dashboard con el nombre de usuario.
             return new ModelAndView(model, "dashboard.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
@@ -527,6 +531,49 @@ public class App {
             return new ModelAndView(model, "teacher_unassign.mustache");
         }, new MustacheTemplateEngine());
 
+        get("/grade-enrollments", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            Object userId = req.session().attribute("userId");
+            User user = User.findById(userId);
+            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+        
+            String sharedHead = "SELECT s.code, s.name, st.initial_condition";
+
+            String sharedBody = " FROM subjects s " +
+                                "INNER JOIN grade_sheets g ON s.id = g.subject_id " +
+                                "INNER JOIN statuses st ON g.id = st.grade_sheet_id " +
+                                "WHERE st.student_id = ? AND st.final_condition ";
+
+            String currSubjectsQuery = sharedHead + sharedBody + "= 'INSCRIPTO'";
+
+            String gradeSubjectsQuery = sharedHead + ", g.year, st.final_condition" + sharedBody + "<> 'INSCRIPTO'";
+
+            List<Map> currSubjects = Base.findAll(currSubjectsQuery, student.getId());
+            List<Map> gradeSubjects = Base.findAll(gradeSubjectsQuery, student.getId());
+
+            model.put("currSubjects", currSubjects);
+            model.put("gradeSubjects", gradeSubjects);
+            model.put("currentYear", Year.now().getValue());
+            return new ModelAndView(model, "grade_enrollments.mustache");
+        }, new MustacheTemplateEngine());
+
+        get("/final-enrollments", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            Object userId = req.session().attribute("userId");
+            User user = User.findById(userId);
+            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+
+            String finalSubjectsQuery = "SELECT s.code, s.name, fs.call, fs.year, fg.grade " + 
+                                "FROM subjects s " + 
+                                "INNER JOIN final_sheets fs ON s.id = fs.subject_id " + 
+                                "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id " + 
+                                "WHERE fg.student_id = ?";
+            
+            List<Map> finalSubjects = Base.findAll(finalSubjectsQuery, student.getId());
+            model.put("finalSubjects", finalSubjects);
+            return new ModelAndView(model, "final_enrollments.mustache");
+        }, new MustacheTemplateEngine());
+
 
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
@@ -603,6 +650,7 @@ public class App {
                 
                 System.out.println("DEBUG: Login exitoso para la cuenta: " + username);
                 System.out.println("DEBUG: ID de Sesión: " + req.session().id());
+                System.out.println("DEBUG: Usuario con role: " + req.session().attribute("activeRole"));
 
                 model.put("username", username); // Añade el nombre de usuario al modelo para el dashboard.
                 model.put("isAdmin", isAdmin);
@@ -1416,6 +1464,28 @@ public class App {
         if (isAdmin == null || !isAdmin) {
             System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
             res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo el administrador puede acceder.", StandardCharsets.UTF_8));
+            halt(); 
+        }
+    }
+
+    /**
+     * Filtro de verificación de acceso a estudiantes.
+     * Solo permite el acceso si el usuario tiene el flag 'isStudent' en true en la sesión.
+     */
+    private static void checkStudentAccess(spark.Request req, spark.Response res) {
+        Boolean isStudent = (Boolean) req.session().attribute("isStudent");
+        Boolean loggedIn = (Boolean) req.session().attribute("loggedIn");
+        String currentUsername = req.session().attribute("currentUserUsername");
+
+        if (currentUsername == null || loggedIn == null || !loggedIn) {
+            res.redirect("/?error=" + URLEncoder.encode("Acceso restringido. Debes iniciar sesión.", StandardCharsets.UTF_8));
+            halt(); 
+            return;
+        }
+
+        if (isStudent == null || !isStudent) {
+            System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
+            res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo los estudiantes pueden acceder.", StandardCharsets.UTF_8));
             halt(); 
         }
     }

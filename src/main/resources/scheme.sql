@@ -172,11 +172,9 @@ DROP TABLE  IF EXISTS grade_sheets;
 CREATE TABLE grade_sheets (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     subject_id INTEGER NOT NULL,
-    student_id INTEGER NOT NULL,
     year INTEGER NOT NULL,
 
-    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
-    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id)
+    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id)
 );
 
 DROP TABLE  IF EXISTS statuses;
