@@ -100,20 +100,6 @@ public class App {
 
         // --- Rutas GET para renderizar formularios y páginas HTML ---
 
-        // GET: Muestra el formulario de creación de cuenta.
-        // Soporta la visualización de mensajes de éxito o error pasados como query parameters.
-        get("/user/create", (req, res) -> {
-
-            // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Cuenta creada!)
-            Map<String, Object> model = Map.of(
-                "tituloPagina", "Crear una cuenta",
-                "errorMessage", req.queryParamOrDefault("error", ""),
-                "successMessage", req.queryParamOrDefault("message", "")
-            );
-
-            // Renderiza la plantilla 'user_form.mustache' con los datos del modelo.
-            return new ModelAndView(model, "user_form.mustache");
-        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
 
         //GET: Muestra el formulario de recuperación de contraseña.
         get("/recover-password", (req, res) -> {
@@ -164,6 +150,31 @@ public class App {
             }
 
             return new ModelAndView(model, "change_password.mustache");
+        }, new MustacheTemplateEngine());
+
+
+        get("/profile/verify-email", (req, res) -> {
+            if (req.session().attribute("userId") == null) {
+                res.redirect("/login");
+                return null;
+            }
+
+            // Si entra acá sin haber pedido un cambio, lo pateamos al perfil
+            if (req.session().attribute("pendingEmail") == null) {
+                res.redirect("/profile");
+                return null;
+            }
+
+            Map<String, Object> model = new HashMap<>();
+            model.put("tituloPagina", "Verificar Correo");
+            model.put("pendingEmail", req.session().attribute("pendingEmail"));
+            
+            String error = req.queryParams("error");
+            if (error != null && !error.isEmpty()) {
+                model.put("errorMessage", error);
+            }
+
+            return new ModelAndView(model, "verify_email.mustache");
         }, new MustacheTemplateEngine());
 
         // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
@@ -250,7 +261,7 @@ public class App {
 
         // GET: Muestra el formulario de inicio de sesión (login).
         // Nota: Esta ruta debería ser capaz de leer también mensajes de error/éxito de los query params
-        // si se la usa como destino de redirecciones. (Tu código de /user/create ya lo hace, aplicar similar).
+        // si se la usa como destino de redirecciones. 
         get("/", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
             String errorMessage = req.queryParams("error");
@@ -264,11 +275,6 @@ public class App {
             return new ModelAndView(model, "login.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
 
-        // GET: Ruta de alias para el formulario de creación de cuenta.
-        // En una aplicación real, probablemente querrías unificar con '/user/create' para evitar duplicidad.
-        get("/user/new", (req, res) -> {
-            return new ModelAndView(new HashMap<>(), "user_form.mustache"); // No pasa un modelo específico, solo el formulario.
-        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
 
 
         get("/profile", (req, res) -> {
@@ -310,6 +316,16 @@ public class App {
             model.put("dni", currentPerson.getDNI());
             model.put("email", currentPerson.getMail());
             model.put("tituloPagina", "Perfil de Usuario");
+
+            String error = req.queryParams("error");
+            if (error != null && !error.isEmpty()) {
+                model.put("errorMessage", error);
+            }
+            String success = req.queryParams("success");
+            if (success != null && !success.isEmpty()) {
+                model.put("successMessage", success);
+            }
+
             String degree = null;
             if(role.equals("TEACHER")){ //Si es teacher, tiene título además de los otros datos
                 List<Teacher> teacher = Teacher.find("person_id = ?", currentPerson.getID());
@@ -356,6 +372,23 @@ public class App {
             // Renderiza la plantilla 'career_form.mustache' con los datos del modelo.
             return new ModelAndView(model, "career_form.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
+
+
+        get("/plan/new",(req, res) -> { 
+            List<Plan> plans = Plan.findAll().include(Career.class);
+
+            List<Career> careers = Career.findAll(); 
+
+            Map<String, Object> model = Map.of(
+                "plans", plans,
+                "careers",careers,
+                "tituloPagina", "Nuevo plan",
+                "errorMessage", req.queryParamOrDefault("errorMessage", ""),
+                "successMessage", req.queryParamOrDefault("successMessage", "")
+            );
+            return new ModelAndView(model, "plan_new.mustache");
+
+        }, new MustacheTemplateEngine());
 
 
         get("/plan/update",(req, res) -> { 
@@ -544,47 +577,7 @@ public class App {
 
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
-        // POST: Maneja el envío del formulario de creación de nueva cuenta.
-        post("/user/new", (req, res) -> {
-            String name = req.queryParams("name");
-            String password = req.queryParams("password");
 
-            // Validaciones básicas: campos no pueden ser nulos o vacíos.
-            if (name == null || name.isEmpty() || password == null || password.isEmpty()) {
-                res.status(400); // Código de estado HTTP 400 (Bad Request).
-                // Redirige al formulario de creación con un mensaje de error.
-                res.redirect("/user/create?error=Nombre y contraseña son requeridos.");
-                return ""; // Retorna una cadena vacía ya que la respuesta ya fue redirigida.
-            }
-
-            try {
-                // Intenta crear y guardar la nueva cuenta en la base de datos.
-                User ac = new User(); // Crea una nueva instancia del modelo User.
-                // Hashea la contraseña de forma segura antes de guardarla.
-                String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
-
-                ac.set("name", name); // Asigna el nombre de usuario.
-                ac.set("password", hashedPassword); // Asigna la contraseña hasheada.
-                ac.set("is_admin", 0);
-                ac.saveIt(); // Guarda el nuevo usuario en la tabla 'users'.
-
-                res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
-                // Redirige al formulario de creación con un mensaje de éxito.
-                res.redirect("/user/create?message=Cuenta creada exitosamente para " + name + "!");
-                return ""; // Retorna una cadena vacía.
-
-            } catch (Exception e) {
-                // Si ocurre cualquier error durante la operación de DB (ej. nombre de usuario duplicado),
-                // se captura aquí y se redirige con un mensaje de error.
-                System.err.println("Error al registrar la cuenta: " + e.getMessage());
-                e.printStackTrace(); // Imprime el stack trace para depuración.
-                res.status(500); // Código de estado HTTP 500 (Internal Server Error).
-                res.redirect("/user/create?error=Error interno al crear la cuenta. Intente de nuevo.");
-                return ""; // Retorna una cadena vacía.
-            }
-        });
-
-        
 
         // POST: Maneja el envío del formulario de inicio de sesión.
         post("/login", (req, res) -> {
@@ -684,47 +677,6 @@ public class App {
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta POST.
 
 
-        // POST: Endpoint para añadir usuarios (API que devuelve JSON, no HTML).
-        // Advertencia: Esta ruta tiene un propósito diferente a las de formulario HTML.
-        post("/add_users", (req, res) -> {
-            res.type("application/json"); // Establece el tipo de contenido de la respuesta a JSON.
-
-            // Obtiene los parámetros 'name' y 'password' de la solicitud.
-            String name = req.queryParams("name");
-            String password = req.queryParams("password");
-
-            // --- Validaciones básicas ---
-            if (name == null || name.isEmpty() || password == null || password.isEmpty()) {
-                res.status(400); // Bad Request.
-                return objectMapper.writeValueAsString(Map.of("error", "Nombre y contraseña son requeridos."));
-            }
-
-            try {
-                // --- Creación y guardado del usuario usando el modelo ActiveJDBC ---
-                User newUser = new User(); // Crea una nueva instancia de tu modelo User.
-                // ¡ADVERTENCIA DE SEGURIDAD CRÍTICA!
-                // En una aplicación real, las contraseñas DEBEN ser hasheadas (ej. con BCrypt)
-                // ANTES de guardarse en la base de datos, NUNCA en texto plano.
-                // (Nota: El código original tenía la contraseña en texto plano aquí.
-                // Se recomienda usar `BCrypt.hashpw(password, BCrypt.gensalt())` como en la ruta '/user/new').
-                newUser.set("name", name); // Asigna el nombre al campo 'name'.
-                newUser.set("password", password); // Asigna la contraseña al campo 'password'.
-                newUser.set("is_admin", 0);
-                newUser.saveIt(); // Guarda el nuevo usuario en la tabla 'users'.
-
-                res.status(201); // Created.
-                // Devuelve una respuesta JSON con el mensaje y el ID del nuevo usuario.
-                return objectMapper.writeValueAsString(Map.of("message", "Usuario '" + name + "' registrado con éxito.", "id", newUser.getId()));
-
-            } catch (Exception e) {
-                // Si ocurre cualquier error durante la operación de DB, se captura aquí.
-                System.err.println("Error al registrar usuario: " + e.getMessage());
-                e.printStackTrace(); // Imprime el stack trace para depuración.
-                res.status(500); // Internal Server Error.
-                return objectMapper.writeValueAsString(Map.of("error", "Error interno al registrar usuario: " + e.getMessage()));
-            }
-        });
-
         post("/subject/new", (req, res) -> {
             String id = req.queryParams("code"); 
             String name = req.queryParams("name");
@@ -812,9 +764,73 @@ public class App {
            }
         });
 
+
+        post("/plan/new", (req, res) -> {
+                     
+            String careerId = req.queryParams("career_id"); // id de la carrera seleccionada
+            String statePlan = req.queryParams("state");   //estado del plan
+            String versionPlan = req.queryParams("version"); // version del plan
+           
+            // Validaciones básicas: campos no pueden ser nulos o vacíos.
+
+             if (careerId == null || careerId.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";
+            }
+
+             if (statePlan == null || statePlan.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";
+
+            }
+
+            if (versionPlan == null || versionPlan.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";  
+
+            }
+
+            //Principal
+            try {
+                // Intenta crear y guardar el nuevo plan de estudios  en la base de datos.
+                
+                Base.openTransaction();  // Iniciamos la transaccion
+
+                Plan np = new Plan(); // Crea una nueva instancia del modelo PLan.
+                
+                np.set("career_id",careerId);
+                np.set("state",statePlan);
+                np.set("version",versionPlan);
+                np.saveIt();
+
+                Base.commitTransaction();               
+
+                res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
+                // Redirige al formulario de creación con un mensaje de éxito.
+                String successMsg = URLEncoder.encode("Plan "+versionPlan+" registrado correctamente.",StandardCharsets.UTF_8);
+                res.redirect("/plan/new?successMessage="+successMsg);
+                return ""; // Retorna una cadena vacía.
+
+
+           } catch (Exception e) {
+               // Si ocurre cualquier error durante la operación de DB (ej. código de carrera duplicado),
+               // se captura aquí y se redirige con un mensaje de error.
+               Base.rollbackTransaction(); // Si falla algo deshace
+               e.printStackTrace(); // Imprime el stack trace para depuración.
+               res.status(500); // Código de estado HTTP 500 (Internal Server Error).
+               String errorMsg = URLEncoder.encode("ERROR: id de plan de carrera ya existente o error interno.", StandardCharsets.UTF_8);
+               res.redirect("/plan/new?errorMessage="+errorMsg);
+               return ""; // Retorna una cadena vacía.
+           }
+        });
+
+
         post("/plan/update", (req, res) -> {
             String planId = req.queryParams("plan_id");
-            String nuevoEstado = req.queryParams("status");
+            String nuevoEstado = req.queryParams("state");
 
             System.out.println("DEBUG POST PLAN: planId=[" + planId + "] | estado=[" + nuevoEstado + "]");
 
@@ -826,7 +842,7 @@ public class App {
             try {
                 Plan p = Plan.findById(Integer.parseInt(planId));
                 if (p != null) {
-                    p.set("status", nuevoEstado);
+                    p.set("state", nuevoEstado);
                     p.saveIt();
                     res.redirect("/plan/update?successMessage=" + URLEncoder.encode("El plan fue actualizado con éxito :D", "UTF-8"));
                 } else {
@@ -1228,13 +1244,6 @@ public class App {
                 String gsSql = "SELECT id FROM grade_sheets WHERE subject_id = ? AND year = ? LIMIT 1";
                 Object gradeSheetId = Base.firstCell(gsSql, subject.getId(), 2026);
 
-                // Si no se abrio el acta de la materia este año, la creamos con su profesor responsable
-                if (gradeSheetId == null) {
-                    Base.exec("INSERT INTO grade_sheets (subject_id, student_id, year) VALUES (?, ?, ?)", 
-                              subject.getId(), subject.get("responsible_id"), 2026);
-                    gradeSheetId = Base.firstCell(gsSql, subject.getId(), 2026);
-                }
-
                 Base.exec("INSERT INTO statuses (grade_sheet_id, student_id, initial_condition, final_condition) VALUES (?, ?, ?, ?)", 
                           gradeSheetId, student.getId(), "INSCRIPTO", "INSCRIPTO");
 
@@ -1355,6 +1364,84 @@ public class App {
 
             res.redirect("/teacher/unassign");
             return null;
+        });
+
+
+        post("/profile/verify-email", (req, res) -> {
+            String inputCode = req.queryParams("code");
+            String realCode = req.session().attribute("emailVerificationCode");
+            String pendingEmail = req.session().attribute("pendingEmail");
+            Object userIdAttr = req.session().attribute("userId");
+
+            // Verificaciones
+            if (userIdAttr == null) {
+                res.redirect("/login");
+                return "";
+            }
+
+            if (inputCode == null || realCode == null || pendingEmail == null) {
+                res.redirect("/profile?error=" + URLEncoder.encode("La sesión de verificación expiró o es inválida.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            if (!inputCode.trim().equals(realCode)) {
+                res.redirect("/profile/verify-email?error=" + URLEncoder.encode("El código es incorrecto. Intentá nuevamente.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            try {
+                User user = User.findById(userIdAttr);
+                if (user != null) {
+                    Person person = Person.findById(user.get("person_id"));
+                    if (person != null) {
+                        person.set("email", pendingEmail);
+                        person.saveIt();
+                        
+                        // Limpiamos la sesión para que no pueda reutilizar el código
+                        req.session().removeAttribute("pendingEmail");
+                        req.session().removeAttribute("emailVerificationCode");
+
+                        res.redirect("/profile?success=" + URLEncoder.encode("Correo actualizado exitosamente.", StandardCharsets.UTF_8));
+                        return "";
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/profile?error=" + URLEncoder.encode("Ocurrió un error al intentar actualizar el correo en la base de datos.", StandardCharsets.UTF_8));
+                return "";
+            }
+            return "";
+        });
+
+        post("/profile/update-email", (req, res) -> {
+            String newEmail = req.queryParams("newEmail");
+            Object userIdAttr = req.session().attribute("userId");
+
+            if (userIdAttr == null) {
+                res.redirect("/login");
+                return "";
+            }
+
+            if (newEmail == null || newEmail.trim().isEmpty()) {
+                res.redirect("/profile?error=" + URLEncoder.encode("El correo no puede estar vacío.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+            if(!newEmail.matches(emailRegex)) {
+                res.redirect("/profile?error=" + URLEncoder.encode("Formato de correo inválido.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            String verificationCode = String.format("%06d", new java.util.Random().nextInt(999999));
+            
+            req.session().attribute("pendingEmail", newEmail.trim());
+            req.session().attribute("emailVerificationCode", verificationCode);
+
+            EmailSender.sendEmailChangeVerificationMail(newEmail.trim(), verificationCode);
+
+            res.redirect("/profile/verify-email");
+            return "";
         });
 
     } // Fin del método main

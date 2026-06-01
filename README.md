@@ -13,37 +13,35 @@ Para poder ejecutar este proyecto en tu máquina local, necesitas tener instalad
 
 ## 🚀 Instalación y Ejecución
 
+Hemos desarrollado una interfaz de línea de comandos (CLI) para facilitar la compilación, testing y ejecución del proyecto sin tener que lidiar con comandos extensos.
+
+
+### Paso 0: Permisos (Solo Linux/Mac)
+Si estás en sistemas basados en Unix, dale permisos de ejecución al script por única vez:
+```bash
+chmod +x manage.sh
+```
+
 ### Paso 1: Base de Datos
-El proyecto utiliza SQLite. Para inicializar la base de datos con datos de prueba, debes:
-1. Crear un archivo vacío llamado `proyecto.db` (o el nombre que figure en tu `DBConfigSingleton`).
-2. Ejecutar el archivo `schema.sql` sobre esa base de datos para crear las tablas.
-3. Ejecutar el archivo `data.sql` para insertar los usuarios y materias de prueba.
-
-### Paso 2: Ejecutar el Proyecto
-Para compilar, instrumentar los modelos de ActiveJDBC y levantar el servidor web, simplemente haz doble clic o ejecuta en terminal el script correspondiente a tu sistema operativo:
-
-- **En Windows:**
-  Doble clic en el archivo `run.bat` o ejecuta en consola:
-  ```cmd
-  .\run.bat
-  ```
+El proyecto utiliza SQLite. Para inicializar la base de datos con datos de desarrollo (db/dev.db),con las tablas necesarias y datos de prueba precargados, ejecuta:
+- **En Windows:** `.\manage.bat reset_db`
+- **En Linux / Mac:** `./manage.sh reset_db`
 
 
-- **En Linux / Mac:**
-    Dale permisos de ejecución al script y córrelo:
-    ```bash
-    chmod +x run.sh
-    ./run.sh
-    ```
-
-### Paso 3: Uso
 
 Una vez que la consola indique que Spark ha iniciado, abre tu navegador web y dirígete a:
 👉 **http://localhost:8080**
 
 
+### Paso 2: Ejecutar el Proyecto
+Para compilar, instrumentar los modelos de ActiveJDBC y levantar el servidor web, en un solo paso, utiliza el comando `crun`:
+- **En Windows:** `.\manage.bat crun`
+- **En Linux / Mac:** `./manage.sh crun`
 
 
+### Paso 3: Uso
+
+Una vez que la consola indique que Spark ha iniciado, abre tu navegador web y dirígete a: **http://localhost:8080**
 
 
 

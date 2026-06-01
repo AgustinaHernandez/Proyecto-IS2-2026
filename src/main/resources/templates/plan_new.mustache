@@ -16,22 +16,22 @@
         </div>
         {{/errorMessage}}
 
-        <h1 class="text-3xl font-bold text-center text-gray-800 dark:text-white mb-6">Actualizar Plan de Estudio</h1>
+        <h1 class="text-3xl font-bold text-center text-gray-800 dark:text-white mb-6">Nuevo Plan de Estudio</h1>
 
-        <form action="/plan/update" method="post" class="space-y-4">
+        <form action="/plan/new" method="post" class="space-y-4">
 
             <div>
-                <label for="plan_id" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Plan de Estudio:</label>
-                <select id="plan_id" name="plan_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                    <option value="" disabled selected>Seleccione un plan de estudio</option>
-                    {{#plans}}
-                    <option value="{{getId}}">{{getDisplayString}}</option>
-                    {{/plans}}
+                <label for="career_id" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Carrera:</label>
+                <select id="career_id" name="career_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="" disabled selected>Seleccione una carrera</option>
+                    {{#careers}}
+                    <option value="{{getId}}">{{name}}</option>
+                    {{/careers}}
                 </select>
             </div>
 
             <div>
-                <label for="state" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Nuevo Estado</label>
+                <label for="state" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Estado</label>
                 <select id="state" name="state" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     <option value="" disabled selected>Seleccione un estado</option>
                     <option value="VIGENTE">Vigente</option>
@@ -40,8 +40,16 @@
                 </select>
             </div>
 
+            <div>
+                <label for="version" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Version del Plan:</label>
+                <input type="number" id="version" name="version" required
+                       class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="{{version}}">{{getDisplayString}}</option>
+            </div>
+
+
             <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200">
-                Actualizar estado del plan
+                Crear Plan de Estudio
             </button>
             
             <div class="text-center mt-4">

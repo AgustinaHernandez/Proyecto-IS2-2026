@@ -6,11 +6,49 @@ import java.util.concurrent.CompletableFuture;
 import javax.mail.*;
 import javax.mail.internet.*;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 public class EmailSender {
-    private static final String REMITENTE = "sistdeinform@gmail.com"; 
-    private static final String PASSWORD = "efwquobjmzanfgbm"; 
+    private static String remitente;
+    private static String password;
+
+    private static synchronized boolean loadCredentials() {
+        if (remitente != null && password != null) return true;
+
+        try {
+            Path path = Paths.get("credentials.json");
+            if (!Files.exists(path)) {
+                System.err.println("\n[!] ERROR: No se encontró credentials.json.");
+                System.err.println("[!] Ejecutá ./manage.sh get_creds\n");
+                return false;
+            }
+            String json = new String(Files.readAllBytes(path));
+            String cleanJson = json.replace("{", "").replace("}", "").replace("\"", "").trim();
+            for (String part : cleanJson.split(",")) {
+                String[] kv = part.split(":");
+                if (kv.length == 2) {
+                    if (kv[0].trim().equals("username")) remitente = kv[1].trim();
+                    if (kv[0].trim().equals("password")) password = kv[1].trim();
+                }
+            }
+            return (remitente != null && password != null);
+        } catch (Exception e) {
+            System.err.println("\n[!] ERROR al leer credentials.json: " + e.getMessage() + "\n");
+            return false;
+        }
+    }
 
     public static void sendMail(String receiver, String title, String content) {
+        if (!loadCredentials()) {
+            System.err.println("[!] Cancelando envío a " + receiver + ". Faltan credenciales.");
+            return; 
+        }
+
+        final String currentRemitente = remitente;
+        final String currentPassword = password;
+        
         CompletableFuture.runAsync(() -> {
             Properties props = new Properties();
             props.put("mail.smtp.auth", "true");
@@ -22,13 +60,13 @@ public class EmailSender {
             Session session = Session.getInstance(props, new Authenticator() {
                 @Override
                 protected PasswordAuthentication getPasswordAuthentication() {
-                    return new PasswordAuthentication(REMITENTE, PASSWORD);
+                    return new PasswordAuthentication(currentRemitente, currentPassword);
                 }
             });
 
             try {
                 Message message = new MimeMessage(session);
-                message.setFrom(new InternetAddress(REMITENTE));
+                message.setFrom(new InternetAddress(currentRemitente));
                 message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(receiver));
                 message.setSubject(title);
                 message.setContent(content, "text/html; charset=utf-8");
@@ -127,4 +165,22 @@ public class EmailSender {
 
         sendMail(receiver, title, content);
     }
+
+
+    public static void sendEmailChangeVerificationMail(String receiver, String code) {
+        String title = "Código de verificación para cambiar tu correo";
+        
+        String content = "<div style=\"font-family: Arial, sans-serif; color: #333333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 8px;\">"
+                + "<h2 style=\"color: #2563eb; margin-bottom: 20px;\">Verificación de Correo</h2>"
+                + "<p style=\"font-size: 16px; line-height: 1.5;\">Solicitaste asociar este correo electrónico a tu cuenta de la universidad.</p>"
+                + "<p style=\"font-size: 16px; line-height: 1.5;\">Ingresá el siguiente código de verificación de 6 dígitos para confirmar el cambio:</p>"
+                + "<div style=\"background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; margin: 25px 0; text-align: center;\">"
+                + "<span style=\"font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1f2937;\">" + code + "</span>"
+                + "</div>"
+                + "<p style=\"font-size: 14px; color: #6b7280; line-height: 1.5;\">Si no solicitaste este cambio, podés ignorar este correo de forma segura.</p>"
+                + "</div>";
+
+        sendMail(receiver, title, content);
+    }
+
 }
