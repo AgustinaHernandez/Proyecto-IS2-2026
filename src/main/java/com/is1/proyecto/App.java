@@ -23,7 +23,8 @@ import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
 
 // Importaciones de clases del proyecto
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
-import com.is1.proyecto.controllers.CareerController;
+import com.is1.proyecto.controllers.*;
+import com.is1.proyecto.controllers.PlanController;
 import com.is1.proyecto.models.*;
 import com.is1.proyecto.models.controllers.TeacherController;
 import com.is1.proyecto.utils.EmailSender;
@@ -105,6 +106,9 @@ public class App {
         get("/career/create", CareerController::renderCreateForm, new MustacheTemplateEngine());
         post("/career/new", CareerController::handleCreateCareer);
 
+        // Modificacion de plan
+        get("/plan/update", PlanController::renderUpdateForm, new MustacheTemplateEngine());
+        post("/plan/update", PlanController::handleUpdatePlan);
 
 
         //GET: Muestra el formulario de recuperación de contraseña.
@@ -377,19 +381,6 @@ public class App {
 
         }, new MustacheTemplateEngine());
 
-
-        get("/plan/update",(req, res) -> { 
-            List<Plan> plans = Plan.findAll().include(Career.class);
-
-            Map<String, Object> model = Map.of(
-                "plans", plans,
-                "tituloPagina", "Modificación de plan",
-                "errorMessage", req.queryParamOrDefault("errorMessage", ""),
-                "successMessage", req.queryParamOrDefault("successMessage", "")
-            );
-            return new ModelAndView(model, "plan_update.mustache");
-
-        }, new MustacheTemplateEngine());
 
         get("/student/delete", (req, res) -> {
             Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
@@ -721,33 +712,6 @@ public class App {
            }
         });
 
-
-        post("/plan/update", (req, res) -> {
-            String planId = req.queryParams("plan_id");
-            String nuevoEstado = req.queryParams("state");
-
-            System.out.println("DEBUG POST PLAN: planId=[" + planId + "] | estado=[" + nuevoEstado + "]");
-
-            if (planId == null || planId.isEmpty() || nuevoEstado == null || nuevoEstado.isEmpty()) {
-                res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("Debes seleccionar un plan y un estado", "UTF-8"));
-                return "";
-            }
-
-            try {
-                Plan p = Plan.findById(Integer.parseInt(planId));
-                if (p != null) {
-                    p.set("state", nuevoEstado);
-                    p.saveIt();
-                    res.redirect("/plan/update?successMessage=" + URLEncoder.encode("El plan fue actualizado con éxito :D", "UTF-8"));
-                } else {
-                    res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("El plan no existe", "UTF-8"));
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                res.redirect("/plan/update?errorMessage=" + URLEncoder.encode("Error: ", "UTF-8"));
-            }
-            return "";
-        });
 
         post("/student/remove", (req, res) -> {
             String id = req.queryParams("id");
