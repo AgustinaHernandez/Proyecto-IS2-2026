@@ -3,6 +3,15 @@ package com.is1.proyecto.services;
 import com.is1.proyecto.models.Person;
 import com.is1.proyecto.models.User;
 
+/** Rutas --------------------------
+ * /dashboard (GET), 
+ * /set-role (POST), 
+ * /profile (GET), 
+ * /settings (GET), 
+ * /profile/update-email (POST), 
+ * /profile/verify-email (GET/POST).
+ */
+
 public class ProfileService {
 
     // Valida el formato del correo

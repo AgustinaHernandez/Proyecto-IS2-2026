@@ -105,6 +105,11 @@ public class App {
         get("/career/create", CareerController::renderCreateForm, new MustacheTemplateEngine());
         post("/career/new", CareerController::handleCreateCareer);
 
+ 
+        // Alta de plan
+        get("/plan/new", PlanController::renderCreateForm, new MustacheTemplateEngine());
+        post("/plan/new", PlanController::handleCreatePlan);
+
         // Modificacion de plan
         get("/plan/update", PlanController::renderUpdateForm, new MustacheTemplateEngine());
         post("/plan/update", PlanController::handleUpdatePlan);
@@ -347,7 +352,7 @@ public class App {
         }, new MustacheTemplateEngine());
 
 
-
+/*
         get("/plan/new",(req, res) -> { 
             List<Plan> plans = Plan.findAll().include(Career.class);
 
@@ -363,7 +368,7 @@ public class App {
             return new ModelAndView(model, "plan_new.mustache");
 
         }, new MustacheTemplateEngine());
-
+ */
 
         get("/student/delete", (req, res) -> {
             Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
@@ -632,7 +637,7 @@ public class App {
         });
 
         
-
+/*
         post("/plan/new", (req, res) -> {
                      
             String careerId = req.queryParams("career_id"); // id de la carrera seleccionada
@@ -694,7 +699,7 @@ public class App {
                return ""; // Retorna una cadena vacía.
            }
         });
-
+ */
 
         post("/student/remove", (req, res) -> {
             String id = req.queryParams("id");

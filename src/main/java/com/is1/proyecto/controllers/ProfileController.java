@@ -11,6 +11,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Rutas --------------------------
+ * /dashboard (GET), 
+ * /set-role (POST), 
+ * /profile (GET), 
+ * /settings (GET), 
+ * /profile/update-email (POST),     ---
+ * /profile/verify-email (GET/POST). ---
+ */
+
+
 public class ProfileController {
 
     // GET

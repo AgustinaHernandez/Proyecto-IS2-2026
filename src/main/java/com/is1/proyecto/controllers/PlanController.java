@@ -12,7 +12,61 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
+/** Rutas --------------------------
+ * /plan/new (GET/POST), 
+ * /plans (GET/POST), 
+ * /plan/update (GET/POST).
+ */
+
 public class PlanController {
+
+    
+    /**
+     *  ---------------- PLAN CREATE ------------------------------------------
+     */
+
+    // GET
+    public static ModelAndView renderCreateForm(Request req, Response res){
+        List<Plan> plans = Plan.findAll().include(Career.class);
+
+        List<Career> careers = Career.findAll();
+
+        Map<String, Object> model = Map.of(
+            "plans", plans,
+            "careers",careers,
+            "tituloPagina", "Nuevo plan",
+            "errorMessage", req.queryParamOrDefault("errorMessage", ""),
+            "successMessage", req.queryParamOrDefault("successMessage", "")
+        );
+       
+        return new ModelAndView(model, "plan_new.mustache");
+    }
+
+    // POST
+    public static Object handleCreatePlan(Request req, Response res){
+        String careerId = req.queryParams("career_id"); // id de la carrera seleccionada
+        String statePlan = req.queryParams("state");   //estado del plan
+        String versionPlan = req.queryParams("version"); // version del plan
+        
+        String errorMsg = PlanService.createNewPlan(careerId, statePlan, versionPlan);
+       
+        if (errorMsg != null) {
+            String encodedError = URLEncoder.encode(errorMsg, StandardCharsets.UTF_8);
+            res.redirect("/plan/new?errorMessage=" + encodedError);
+        } else {
+            String successMsg = URLEncoder.encode("Plan "+versionPlan+" registrado correctamente.",StandardCharsets.UTF_8);
+            res.redirect("/plan/new?successMessage=" + successMsg);
+        }
+
+        return errorMsg;
+    }
+
+
+
+
+    /**
+     *  ---------------- PLAN UPDATE ------------------------------------------
+     */
 
     // GET
     public static ModelAndView renderUpdateForm(Request req, Response res) {
@@ -47,4 +101,12 @@ public class PlanController {
         }
         return "";
     }
+
+
+    /**
+     *  ---------------- LIST PLAN ------------------------------------------
+     *  (refactorizar)
+     */
+
+
 }
