@@ -23,4 +23,13 @@ public class Enrolled_Plan extends Model {
     public void setPlanId(Integer id) { 
         set("plan_id", id); 
     }
+
+    /*Para la vista en academic-performance */
+    public String getDisplayString() {
+        Plan plan = parent(Plan.class);
+        if (plan != null) {
+            return plan.getDisplayString();
+        }
+        return "";
+    }
 }
