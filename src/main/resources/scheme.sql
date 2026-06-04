@@ -223,9 +223,9 @@ DROP TABLE  IF EXISTS final_grades;
 CREATE TABLE final_grades (
     final_sheet_id INTEGER NOT NULL,
     student_id INTEGER NOT NULL,
-    grade INTEGER NOT NULL,
+    grade INTEGER,
 
-    CONSTRAINT chk_grade CHECK (grade >= 1 AND grade <= 10),
+    CONSTRAINT chk_grade CHECK (grade >= 1 AND grade <= 10 OR grade IS NULL),
     CONSTRAINT fk_fs FOREIGN KEY (final_sheet_id) REFERENCES final_sheets (id),
     CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id),
     CONSTRAINT pk_final_grades PRIMARY KEY (final_sheet_id, student_id)

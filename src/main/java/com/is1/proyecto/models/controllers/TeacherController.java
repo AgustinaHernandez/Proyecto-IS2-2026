@@ -2,13 +2,16 @@ package com.is1.proyecto.models.controllers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.time.temporal.ChronoUnit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.is1.proyecto.models.FinalSheet;
 import com.is1.proyecto.models.Person;
 import com.is1.proyecto.models.Status;
 import com.is1.proyecto.models.Student;
@@ -452,6 +455,190 @@ public class TeacherController {
             } catch (NumberFormatException e) {
                 res.redirect("/teacher/select-subjects?error=" + URLEncoder.encode("Materia inválida.", StandardCharsets.UTF_8));
                 return null;
+            }
+        }, engine);
+
+        get("/teacher/grade-final", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            String finalSheetIdStr = req.queryParams("final_sheet_id");
+
+            if (finalSheetIdStr == null || finalSheetIdStr.trim().isEmpty()) {
+                res.redirect("/teacher/select-final?error=" + URLEncoder.encode("Debés seleccionar una mesa de examen.", StandardCharsets.UTF_8));
+                return null;
+            }
+
+            try {
+                Integer finalSheetId = Integer.parseInt(finalSheetIdStr);
+                FinalSheet finalSheet = FinalSheet.findById(finalSheetId);
+                Subject subject = Subject.findById(finalSheet.get("subject_id"));
+
+                LocalDate examDate = LocalDate.parse(finalSheet.getString("year"));
+                LocalDate hoy = LocalDate.now();
+                LocalDate deadline = examDate.plusDays(15); //Tiene hasta 15 días después
+
+                if (hoy.isBefore(examDate)) {
+                    res.redirect("/teacher/select-final?error=" + URLEncoder.encode("Aún no se puede calificar esta mesa.", StandardCharsets.UTF_8));
+                    return null;
+                }
+                if (hoy.isAfter(deadline)) {
+                    res.redirect("/teacher/select-final?error=" + URLEncoder.encode("El plazo de 15 días para cargar las notas venció.", StandardCharsets.UTF_8));
+                    return null;
+                }
+
+                //Calcular cuántos días le quedan
+                long daysLeft = ChronoUnit.DAYS.between(hoy, deadline);
+                model.put("daysLeft", daysLeft);
+
+                //Activar las alertas
+                if (daysLeft == 0) {
+                    model.put("lastDayWarning", true);
+                } else {
+                    model.put("daysWarning", true);
+                }
+                
+                model.put("subjectName", subject.getString("name"));
+                model.put("callName", finalSheet.getString("call"));
+                model.put("year", finalSheet.getDate("year"));
+                model.put("finalSheetId", finalSheetId);
+
+                //Traer a todos los inscriptos
+                List<Student> students = Student.findBySQL(
+                    "SELECT s.* FROM students s INNER JOIN final_grades fg ON s.id = fg.student_id WHERE fg.final_sheet_id = ?", finalSheetId
+                );
+
+                List<Map<String, Object>> listadoAlumnos = new ArrayList<>();
+                
+                for (Student s : students) {
+                    Person p = Person.findById(s.get("person_id"));
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("studentId", s.getId());
+                    map.put("getDNI", p.get("dni"));
+                    map.put("getFullNameString", p.getString("last_name") + ", " + p.getString("first_name"));
+                    
+                    //Consultar si el alumno ya tiene una nota en la base de datos
+                    Object notaObj = Base.firstCell("SELECT grade FROM final_grades WHERE final_sheet_id = ? AND student_id = ?", finalSheetId, s.getId());
+                    
+                    //Armar las opciones del select dinámicamente desde Java
+                    List<Map<String, Object>> options = new ArrayList<>();
+                    
+                    //Opción default (Ausente o sin cargar), es con valor vacío
+                    options.add(Map.of("value", "", "label", "Ausente / Sin Nota", "selected", notaObj == null));
+                    
+                    //Opciones del 1 al 10
+                    for(int i = 1; i <= 10; i++) {
+                        boolean isSelected = (notaObj != null && ((Number)notaObj).intValue() == i);
+                        options.add(Map.of("value", String.valueOf(i), "label", String.valueOf(i), "selected", isSelected));
+                    }
+                    
+                    map.put("gradeOptions", options);
+                    listadoAlumnos.add(map);
+                }
+
+                model.put("students", listadoAlumnos);
+                model.put("hasStudents", !listadoAlumnos.isEmpty());
+
+                String success = req.queryParams("success");
+                if (success != null) model.put("successMessage", success);
+                String error = req.queryParams("error");
+                if (error != null) model.put("errorMessage", error);
+
+                return new ModelAndView(model, "teacher_grade_final.mustache");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/teacher/select-final?error=" + URLEncoder.encode("Error al cargar la planilla.", StandardCharsets.UTF_8));
+                return null;
+            }
+        }, engine);
+
+        post("/teacher/grade-final", (req, res) -> {
+            String finalSheetIdStr = req.queryParams("final_sheet_id");
+            
+            try {
+                FinalSheet fs = FinalSheet.findById(finalSheetIdStr);
+                LocalDate examDate = LocalDate.parse(fs.getString("year"));
+                LocalDate hoy = LocalDate.now();
+                LocalDate deadline = examDate.plusDays(15);
+
+                // Candado
+                if (hoy.isAfter(deadline)) {
+                    res.redirect("/teacher/select-final?error=" + URLEncoder.encode("El plazo para guardar notas venció. Contacte a administración.", StandardCharsets.UTF_8));
+                    return "";
+                }
+                Base.openTransaction();
+                
+                for (String paramName : req.queryParams()) {
+                    if (paramName.startsWith("grade_")) {
+                        String studentIdStr = paramName.substring(6); //Cortar "grade_" para quedarnos con el ID
+                        String gradeStr = req.queryParams(paramName);
+
+                        if (gradeStr != null && !gradeStr.trim().isEmpty()) {
+                            //Si el teacher puso un número del 1 al 10
+                            Integer grade = Integer.parseInt(gradeStr);
+                            Base.exec("UPDATE final_grades SET grade = ? WHERE final_sheet_id = ? AND student_id = ?", 
+                                    grade, Integer.parseInt(finalSheetIdStr), Integer.parseInt(studentIdStr));
+                        } else {
+                            //Si el teacher puso "Ausente / Sin Nota"
+                            Base.exec("UPDATE final_grades SET grade = NULL WHERE final_sheet_id = ? AND student_id = ?", 
+                                    Integer.parseInt(finalSheetIdStr), Integer.parseInt(studentIdStr));
+                        }
+                    }
+                }
+                
+                Base.commitTransaction();
+                res.redirect("/teacher/grade-final?final_sheet_id=" + finalSheetIdStr + "&success=" + URLEncoder.encode("¡Planilla guardada correctamente!", StandardCharsets.UTF_8));
+                
+            } catch (Exception e) {
+                Base.rollbackTransaction();
+                e.printStackTrace();
+                res.redirect("/teacher/grade-final?final_sheet_id=" + finalSheetIdStr + "&error=" + URLEncoder.encode("Error al procesar las notas.", StandardCharsets.UTF_8));
+            }
+            return "";
+        });
+
+        get("/teacher/select-final", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            String currentUsername = req.session().attribute("currentUserUsername");
+            
+            if (currentUsername == null) {
+                res.redirect("/");
+                return null;
+            }
+
+            try {
+                User user = User.findFirst("name = ?", currentUsername);
+                Teacher teacher = Teacher.findFirst("person_id = ?", user.get("person_id"));
+
+                if (teacher == null) {
+                    res.redirect("/dashboard?error=" + URLEncoder.encode("Tu usuario no está registrado como docente.", StandardCharsets.UTF_8));
+                    return null;
+                }
+
+                String hoy = LocalDate.now().toString();
+                String limitePasado = LocalDate.now().minusDays(7).toString();
+
+                // SQL: "WHERE fs.year <= ?" para que no pueda calificar un examen del futuro
+                String sql = "SELECT fs.id as final_sheet_id, fs.call, fs.year, s.name as subject_name " +
+                    "FROM final_sheets fs " +
+                    "INNER JOIN subjects s ON fs.subject_id = s.id " +
+                    "INNER JOIN teaches t ON s.id = t.subject_id " +
+                    "WHERE t.teacher_id = ? AND fs.year <= ? AND fs.year >= ? " +
+                    "ORDER BY fs.year DESC, fs.call ASC";
+                
+                List<Map> mesasDelProfe = Base.findAll(sql, teacher.getId(), hoy, limitePasado);
+                
+                model.put("finalSheets", mesasDelProfe);
+                model.put("hasFinalSheets", !mesasDelProfe.isEmpty());
+
+                String error = req.queryParams("error");
+                if (error != null) model.put("errorMessage", error);
+
+                return new ModelAndView(model, "teacher_select_final.mustache");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                model.put("errorMessage", "Error interno al cargar las mesas de examen.");
+                return new ModelAndView(model, "teacher_select_final.mustache");
             }
         }, engine);
     }

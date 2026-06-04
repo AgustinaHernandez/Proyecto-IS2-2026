@@ -17,6 +17,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Year;
 import java.util.ArrayList;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 // Importaciones estándar de Java
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.List;
@@ -628,6 +630,37 @@ public class App {
                 model.put("errorMessage", "Error al cargar los planes de estudio.");
                 return new ModelAndView(model, "student_enroll_plan.mustache");
             }
+        }, engine);
+
+        get("/final/new", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            
+            try {
+                //Traer todas las carreras para el primer desplegable
+                List<Map<String, Object>> careers = Career.findAll().toMaps();
+                model.put("careers", careers);
+                
+                //Traer las materias con su id de carrera
+                //Se usa DISTINCT por si la materia está en varios planes de la misma carrera
+                String sqlSubjects = "SELECT DISTINCT s.id, s.name, c.id as career_id FROM subjects s " +
+                                    "INNER JOIN subject_belongs_plan sbp ON s.id = sbp.subject_id " +
+                                    "INNER JOIN plans p ON sbp.plan_id = p.id " +
+                                    "INNER JOIN careers c ON p.career_id = c.id " +
+                                    "ORDER BY s.name ASC";
+                
+                List<Map> subjects = Base.findAll(sqlSubjects);
+                model.put("subjects", subjects);
+
+                String success = req.queryParams("success");
+                if (success != null) model.put("successMessage", success);
+                String error = req.queryParams("error");
+                if (error != null) model.put("errorMessage", error);
+
+            } catch (Exception e) {
+                model.put("errorMessage", "Error al cargar los datos del formulario.");
+            }
+            
+            return new ModelAndView(model, "final_new.mustache");
         }, engine);
 
 
@@ -1549,6 +1582,81 @@ public class App {
                 e.printStackTrace();
                 res.redirect("/student/enroll-plan?error=" + URLEncoder.encode("Ocurrió un error al procesar tu inscripción.", StandardCharsets.UTF_8));
             }
+            return "";
+        });
+
+        post("/final/new", (req, res) -> {
+            String subjectIdStr = req.queryParams("subject_id");
+            String dateStr = req.queryParams("date"); //Con formato YYYY-MM-DD
+            String call = req.queryParams("call"); //"Primero", "Segundo", "Tercero"
+
+            if (subjectIdStr == null || dateStr == null || call == null || dateStr.isEmpty()) {
+                res.redirect("/final/new?error=" + URLEncoder.encode("Todos los campos son obligatorios.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            try {
+                LocalDate newExamDate = LocalDate.parse(dateStr);
+                LocalDate hoy = LocalDate.now();
+
+                //No se pueden crear mesas en el pasado
+                if (newExamDate.isBefore(hoy)) {
+                    res.redirect("/final/new?error=" + URLEncoder.encode("La fecha del examen no puede ser en el pasado.", StandardCharsets.UTF_8));
+                    return "";
+                }
+
+                int examYear = newExamDate.getYear();
+
+                //Traer las mesas de la materia que ya estén programadas para el mismo año corriente
+                String sql = "SELECT * FROM final_sheets WHERE subject_id = ? AND year LIKE ?";
+                List<FinalSheet> existingSheets = FinalSheet.findBySQL(sql, Integer.parseInt(subjectIdStr), examYear + "-%");
+
+                //Validaciones de tiempo
+                for (FinalSheet fs : existingSheets) {
+                    String existingCall = fs.getString("call");
+                    LocalDate existingDate = LocalDate.parse(fs.getString("year"));
+
+                    //Evitar duplicados del mismo llamado en el mismo año
+                    if (existingCall.equals(call)) {
+                        res.redirect("/final/new?error=" + URLEncoder.encode("Ya existe un '" + call + " Llamado' para esta materia en el año " + examYear + ".", StandardCharsets.UTF_8));
+                        return "";
+                    }
+
+                    //Orden de llamados (Primero < Segundo < Tercero)
+                    if (call.equals("Primero")) {
+                        if ((existingCall.equals("Segundo") || existingCall.equals("Tercero")) && newExamDate.isAfter(existingDate)) {
+                            res.redirect("/final/new?error=" + URLEncoder.encode("El Primer Llamado debe ser ANTERIOR al Segundo/Tercer llamado.", StandardCharsets.UTF_8));
+                            return "";
+                        }
+                    } else if (call.equals("Segundo")) {
+                        if (existingCall.equals("Primero") && newExamDate.isBefore(existingDate)) {
+                            res.redirect("/final/new?error=" + URLEncoder.encode("El Segundo Llamado debe ser POSTERIOR al Primer llamado.", StandardCharsets.UTF_8));
+                            return "";
+                        }
+                        if (existingCall.equals("Tercero") && newExamDate.isAfter(existingDate)) {
+                            res.redirect("/final/new?error=" + URLEncoder.encode("El Segundo Llamado debe ser ANTERIOR al Tercer llamado.", StandardCharsets.UTF_8));
+                            return "";
+                        }
+                    } else if (call.equals("Tercero")) {
+                        if ((existingCall.equals("Primero") || existingCall.equals("Segundo")) && newExamDate.isBefore(existingDate)) {
+                            res.redirect("/final/new?error=" + URLEncoder.encode("El Tercer Llamado debe ser POSTERIOR a los llamados anteriores.", StandardCharsets.UTF_8));
+                            return "";
+                        }
+                    }
+                }
+
+                Base.exec("INSERT INTO final_sheets (subject_id, year, call) VALUES (?, ?, ?)", 
+                        Integer.parseInt(subjectIdStr), dateStr, call);
+                
+                res.redirect("/final/new?success=" + URLEncoder.encode("¡Mesa de examen creada exitosamente!", StandardCharsets.UTF_8));
+
+            } catch (DateTimeParseException e) {
+                res.redirect("/final/new?error=" + URLEncoder.encode("Formato de fecha inválido.", StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/final/new?error=" + URLEncoder.encode("Error interno al crear la mesa de examen.", StandardCharsets.UTF_8));
+            }
+            
             return "";
         });
 
