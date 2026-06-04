@@ -131,7 +131,7 @@ public class App {
             Boolean loggedIn = req.session().attribute("loggedIn");
             
             if (currentUsername == null || loggedIn == null || !loggedIn) {
-                System.out.println("DEBUG: Acceso no autorizado a /change-password. Redirigiendo a /login.");
+                System.out.println("DEBUG: Acceso no autorizado a /change-password. Redirigiendo a /.");
                 res.redirect("/?error=Acceso+no+autorizado.");
                 return null;
             }
@@ -155,7 +155,7 @@ public class App {
 
         get("/profile/verify-email", (req, res) -> {
             if (req.session().attribute("userId") == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
 
@@ -190,7 +190,7 @@ public class App {
             // Si no hay un nombre de usuario en la sesión, la bandera es nula o falsa,
             // significa que el usuario no está logueado o su sesión expiró.
             if (currentUsername == null || loggedIn == null || !loggedIn) {
-                System.out.println("DEBUG: Acceso no autorizado a /dashboard. Redirigiendo a /login.");
+                System.out.println("DEBUG: Acceso no autorizado a /dashboard. Redirigiendo a /.");
                 // Redirige al login con un mensaje de error.
                 res.redirect("/?error=Acceso no autorizado.");
                 return null; // Importante retornar null después de una redirección.
@@ -237,7 +237,7 @@ public class App {
             
             // Verificar sesión (opcional, pero recomendado)
             if (req.session().attribute("loggedIn") == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
             model.put("tituloPagina", "Configuración");
@@ -251,7 +251,7 @@ public class App {
             // La cookie JSESSIONID en el navegador también será gestionada para invalidarse.
             req.session().invalidate();
 
-            System.out.println("DEBUG: Sesión cerrada. Redirigiendo a /login.");
+            System.out.println("DEBUG: Sesión cerrada. Redirigiendo a /.");
 
             // Redirige al usuario a la página de login con un mensaje de éxito.
             res.redirect("/");
@@ -449,7 +449,7 @@ public class App {
             Object userIdAttr = req.session().attribute("userId");
             if (userIdAttr == null) {
                 req.session().attribute("error", "Acceso no autorizado.");
-                res.redirect("/login"); 
+                res.redirect("/"); 
                 return null;
             }
             
@@ -464,7 +464,7 @@ public class App {
             
             User user = User.findById(userIdAttr);
             if (user == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
             
@@ -573,6 +573,62 @@ public class App {
             model.put("finalSubjects", finalSubjects);
             return new ModelAndView(model, "final_enrollments.mustache");
         }, new MustacheTemplateEngine());
+
+        // GET: Muestra el formulario de inscripción a la carrera/plan
+        get("/student/enroll-plan", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+
+            String currentUsername = req.session().attribute("currentUserUsername");
+            if (currentUsername == null) {
+                res.redirect("/login");
+                return null;
+            }
+
+            try {
+                //Verificar que el usuario sea un estudiante
+                User user = User.findFirst("name = ?", currentUsername);
+                if (user != null) {
+                    Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+                    
+                    if (student == null) {
+                        res.redirect("/dashboard?error=" + URLEncoder.encode("Tu cuenta no está registrada como estudiante.", StandardCharsets.UTF_8));
+                        return null;
+                    }
+
+                    //Traer solo los planes que estén VIGENTE o A TERMINO
+                    List<Plan> availablePlans = Plan.where("state IN ('VIGENTE', 'A TERMINO')");
+                    List<Map<String, Object>> planesList = new ArrayList<>();
+
+                    for (Plan plan : availablePlans) {
+                        Career career = Career.findById(plan.get("career_id"));
+                        if (career != null) {
+                            Map<String, Object> planMap = new HashMap<>();
+                            planMap.put("planId", plan.getId());
+                            String displayName = career.getString("name") + " - Plan " + plan.get("version") + " (" + plan.getString("state") + ")";
+                            planMap.put("displayName", displayName);
+                            
+                            planesList.add(planMap);
+                        }
+                    }
+
+                    model.put("plans", planesList);
+                    model.put("hasPlans", !planesList.isEmpty());
+                }
+
+                String success = req.queryParams("success");
+                if (success != null) model.put("successMessage", success);
+                
+                String error = req.queryParams("error");
+                if (error != null) model.put("errorMessage", error);
+
+                return new ModelAndView(model, "student_enroll_plan.mustache");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                model.put("errorMessage", "Error al cargar los planes de estudio.");
+                return new ModelAndView(model, "student_enroll_plan.mustache");
+            }
+        }, engine);
 
 
         // --- Rutas POST para manejar envíos de formularios y APIs ---
@@ -1209,7 +1265,7 @@ public class App {
             String activeRole = req.session().attribute("activeRole");
 
             if (userIdAttr == null || !"STUDENT".equals(activeRole)) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
 
@@ -1225,7 +1281,7 @@ public class App {
             Subject subject = Subject.findById(subjectIdParam);
 
             if (student == null || subject == null) {
-                req.session().attribute("error", "Error de consistencia: Alumno o materia no encontrados.");
+                req.session().attribute("error", "Error: Alumno o materia no encontrados.");
                 res.redirect("/enrollment");
                 return null;
             }
@@ -1240,19 +1296,30 @@ public class App {
             try {
                 Base.openTransaction();
 
-                // Buscamos el acta (grade_sheet) de cursado de la materia para el ciclo lectivo 2026
-                String gsSql = "SELECT id FROM grade_sheets WHERE subject_id = ? AND year = ? LIMIT 1";
-                Object gradeSheetId = Base.firstCell(gsSql, subject.getId(), 2026);
+                //Obtener el verdadero año actual
+                int currentYear = Year.now().getValue();
 
+                //Buscar el acta de cursado de la materia para el ciclo lectivo actual
+                String gsSql = "SELECT id FROM grade_sheets WHERE subject_id = ? AND year = ? LIMIT 1";
+                Object gradeSheetId = Base.firstCell(gsSql, subject.getId(), currentYear);
+
+                //Si la gradesheet no existe, se crea en el momento 
+                if (gradeSheetId == null) {
+                    Base.exec("INSERT INTO grade_sheets (subject_id, year) VALUES (?, ?)", subject.getId(), currentYear);
+                    //Recuperamos el ID que se le acaba de asignar
+                    gradeSheetId = Base.firstCell(gsSql, subject.getId(), currentYear);
+                }
+
+                //Insertar el estado del alumno a la planilla
                 Base.exec("INSERT INTO statuses (grade_sheet_id, student_id, initial_condition, final_condition) VALUES (?, ?, ?, ?)", 
                           gradeSheetId, student.getId(), "INSCRIPTO", "INSCRIPTO");
 
                 Base.commitTransaction();
-                req.session().attribute("success", "¡Te has inscripto con éxito a " + subject.getString("name") + "!");
+                req.session().attribute("success", "¡Te inscribiste con éxito a " + subject.getString("name") + "!");
                 
             } catch (Exception e) {
                 Base.rollbackTransaction();
-                req.session().attribute("error", "Ocurrió un error inesperado en el servidor al procesar el alta.");
+                req.session().attribute("error", "Ocurrió un error en el servidor al procesar la solicitud.");
                 e.printStackTrace();
             }
 
@@ -1375,7 +1442,7 @@ public class App {
 
             // Verificaciones
             if (userIdAttr == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return "";
             }
 
@@ -1418,7 +1485,7 @@ public class App {
             Object userIdAttr = req.session().attribute("userId");
 
             if (userIdAttr == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return "";
             }
 
@@ -1441,6 +1508,47 @@ public class App {
             EmailSender.sendEmailChangeVerificationMail(newEmail.trim(), verificationCode);
 
             res.redirect("/profile/verify-email");
+            return "";
+        });
+
+        // POST: Inscripción a plan de estudio
+        post("/student/enroll-plan", (req, res) -> {
+            String currentUsername = req.session().attribute("currentUserUsername");
+            if (currentUsername == null) {
+                res.redirect("/login");
+                return "";
+            }
+
+            String planIdStr = req.queryParams("plan_id");
+            if (planIdStr == null || planIdStr.trim().isEmpty()) {
+                res.redirect("/student/enroll-plan?error=" + URLEncoder.encode("Debe seleccionar un plan de estudios.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            try {
+                User user = User.findFirst("name = ?", currentUsername);
+                Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+                Integer planId = Integer.parseInt(planIdStr);
+
+                //Ver si ya está inscripto en ese plan
+                Long count = Base.count("enrolled_plan", "student_id = ? AND plan_id = ?", student.getId(), planId);
+                
+                if (count > 0) {
+                    res.redirect("/student/enroll-plan?error=" + URLEncoder.encode("Ya estás inscripto en esta carrera y plan.", StandardCharsets.UTF_8));
+                    return "";
+                }
+
+                //Realizar la inscripción
+                //Se usa Base.exec() porque enrolled_plan usa una PK compuesta y no tiene columna 'id'
+                Base.exec("INSERT INTO enrolled_plan (student_id, plan_id) VALUES (?, ?)", student.getId(), planId);
+
+                String successMsg = URLEncoder.encode("¡Inscripción exitosa a la carrera!", StandardCharsets.UTF_8);
+                res.redirect("/student/enroll-plan?success=" + successMsg);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/student/enroll-plan?error=" + URLEncoder.encode("Ocurrió un error al procesar tu inscripción.", StandardCharsets.UTF_8));
+            }
             return "";
         });
 

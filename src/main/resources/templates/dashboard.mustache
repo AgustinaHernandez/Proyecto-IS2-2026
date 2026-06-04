@@ -90,11 +90,16 @@
                     {{/isActiveAdmin}}
 
                     {{^isActiveAdmin}}
-                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-5 leading-relaxed">Consulta los planes de estudio disponibles.</p>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-5 leading-relaxed">Consultar o inscribirse a los planes de estudio disponibles.</p>
                     {{/isActiveAdmin}}
                     <a href="/plans" class="inline-flex items-center text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 transition-colors">
                         Consultar Planes <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                     </a>
+                    {{#isActiveStudent}}
+                    <a href="/student/enroll-plan" class="inline-flex items-center text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 transition-colors">
+                        Inscribirse a un Plan <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </a>
+                    {{/isActiveStudent}}
                 </div>
             </div>
             
@@ -186,6 +191,22 @@
                 </div>
             </div>
             {{/isActiveAdmin}}
+
+            {{#isActiveTeacher}}
+            <div class="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-50 dark:bg-emerald-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                <div class="relative z-10">
+                    <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-2">Listado de Estudiantes</h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-5 leading-relaxed">Consulta la lista completa de alumnos inscritos en tus materias.</p>
+                    <a href="/teacher/select-subject" class="inline-flex items-center text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors">
+                        Ver Listado <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </a>
+                </div>
+            </div>
+            {{/isActiveTeacher}}
 
             <!-- Inscripcion a materias -->
             {{#isActiveStudent}}
