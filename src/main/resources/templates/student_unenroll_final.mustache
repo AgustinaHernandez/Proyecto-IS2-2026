@@ -1,0 +1,74 @@
+{{> header}}
+
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen p-4 transition-colors duration-300 flex justify-center items-start pt-10">
+    
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-5xl border border-gray-200 dark:border-gray-700">
+
+        <h1 class="text-3xl font-bold text-center text-gray-800 dark:text-white mb-2">{{tituloPagina}}</h1>
+        <p class="text-center text-gray-600 dark:text-gray-400 mb-8">
+            Acá podés ver y darte de baja de las mesas de examen en las que te anotaste.<br>
+            Tené en cuenta que solo podés darte de baja <strong>hasta el día anterior</strong> al examen.
+        </p>
+
+        {{#successMessage}}
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg relative mb-6 shadow-sm">
+            <span class="block sm:inline font-medium">{{successMessage}}</span>
+        </div>
+        {{/successMessage}}
+
+        {{#errorMessage}}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6 shadow-sm">
+            <span class="block sm:inline font-medium">{{errorMessage}}</span>
+        </div>
+        {{/errorMessage}}
+
+        <div class="relative overflow-x-auto shadow-sm sm:rounded-lg border border-gray-200 dark:border-gray-700 mb-6">
+            <table class="w-full text-sm text-left text-gray-700 dark:text-gray-300">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <tr>
+                        <th scope="col" class="px-6 py-3">Materia</th>
+                        <th scope="col" class="px-6 py-3">Fecha del Examen</th>
+                        <th scope="col" class="px-6 py-3">Llamado</th>
+                        <th scope="col" class="px-6 py-3 text-center">Acción</th>
+                    </tr>
+                </thead>
+                
+                <tbody>
+                    {{#finals}}
+                    <tr class="bg-white border-b dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200">
+                        <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                            {{subject_name}}
+                        </td>
+                        <td class="px-6 py-4">{{exam_date}}</td>
+                        <td class="px-6 py-4">{{call}}</td>
+                        <td class="px-6 py-4 text-center">
+                            <form action="/student/unenroll-final" method="POST" onsubmit="return confirm('¿Estás seguro de que querés darte de baja de esta mesa de examen? Esta acción no se puede deshacer.');">
+                                <input type="hidden" name="final_sheet_id" value="{{sheet_id}}">
+                                <button type="submit" class="text-red-600 hover:text-red-900 dark:text-red-500 dark:hover:text-red-400 font-medium transition-colors duration-200">
+                                    Dar de baja
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {{/finals}}
+                    
+                    {{^finals}}
+                    <tr class="bg-white dark:bg-gray-800">
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                            Actualmente no estás inscripto en ninguna mesa de examen próxima.
+                        </td>
+                    </tr>
+                    {{/finals}}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex justify-center mt-6">
+            <a href="/dashboard" class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 text-center shadow-sm">
+                Volver al panel principal
+            </a>
+        </div>
+
+    </div>
+</body>
+</html>

@@ -713,6 +713,57 @@ public class App {
         }, new MustacheTemplateEngine());
 
 
+        get("/student/unenroll-final", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+
+            String currentUsername = req.session().attribute("currentUserUsername");
+            if (currentUsername == null) {
+                res.redirect("/login");
+                return null;
+            }
+
+            try {
+                User user = User.findFirst("name = ?", currentUsername);
+                if (user != null) {
+                    Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+                    
+                    if (student == null) {
+                        res.redirect("/dashboard?error=" + URLEncoder.encode("Tu cuenta no está registrada como estudiante.", StandardCharsets.UTF_8));
+                        return null;
+                    }
+
+                    // Traer solo las mesas en las que está inscripto y que la fecha sea mayor a hoy
+                    String today = LocalDate.now().toString();
+                    String sql = "SELECT fs.id as sheet_id, s.name as subject_name, fs.year as exam_date, fs.call " +
+                                 "FROM final_grades fg " +
+                                 "INNER JOIN final_sheets fs ON fg.final_sheet_id = fs.id " +
+                                 "INNER JOIN subjects s ON fs.subject_id = s.id " +
+                                 "WHERE fg.student_id = ? AND fs.year > ? " +
+                                 "ORDER BY fs.year ASC";
+                    
+                    List<Map> enrolledFinals = Base.findAll(sql, student.getId(), today);
+
+                    model.put("finals", enrolledFinals);
+                    model.put("hasFinals", !enrolledFinals.isEmpty());
+                    model.put("tituloPagina", "Mis Inscripciones a Finales");
+                }
+
+                String success = req.queryParams("success");
+                if (success != null) model.put("successMessage", success);
+                
+                String error = req.queryParams("error");
+                if (error != null) model.put("errorMessage", error);
+
+                return new ModelAndView(model, "student_unenroll_final.mustache");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                model.put("errorMessage", "Error al cargar tus inscripciones.");
+                return new ModelAndView(model, "student_unenroll_final.mustache");
+            }
+        }, new MustacheTemplateEngine());
+
+
 
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
@@ -1746,6 +1797,49 @@ public class App {
             }
             return "";
         });
+
+        post("/student/unenroll-final", (req, res) -> {
+            String currentUsername = req.session().attribute("currentUserUsername");
+            if (currentUsername == null) {
+                res.redirect("/login");
+                return "";
+            }
+
+            String finalSheetIdStr = req.queryParams("final_sheet_id");
+            if (finalSheetIdStr == null || finalSheetIdStr.trim().isEmpty()) {
+                res.redirect("/student/unenroll-final?error=" + URLEncoder.encode("Debe seleccionar una mesa de examen válida.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            try {
+                User user = User.findFirst("name = ?", currentUsername);
+                Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+                Integer finalSheetId = Integer.parseInt(finalSheetIdStr);
+                String today = LocalDate.now().toString();
+
+                Long count = Base.count("final_sheets", "id = ? AND year > ?", finalSheetId, today);
+                if (count == 0) {
+                    res.redirect("/student/unenroll-final?error=" + URLEncoder.encode("No podés darte de baja. El plazo venció o la mesa no existe.", StandardCharsets.UTF_8));
+                    return "";
+                }
+
+                int deleted = Base.exec("DELETE FROM final_grades WHERE student_id = ? AND final_sheet_id = ?", student.getId(), finalSheetId);
+                
+                if (deleted == 0)
+                    res.redirect("/student/unenroll-final?error=" + URLEncoder.encode("No estabas inscripto en esta mesa.", StandardCharsets.UTF_8));
+                else
+                    res.redirect("/student/unenroll-final?success=" + URLEncoder.encode("Te diste de baja de la mesa de examen correctamente.", StandardCharsets.UTF_8));
+                
+
+            } catch (NumberFormatException e) {
+                res.redirect("/student/unenroll-final?error=" + URLEncoder.encode("El ID de la mesa es inválido.", StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/student/unenroll-final?error=" + URLEncoder.encode("Ocurrió un error al procesar la baja de la mesa.", StandardCharsets.UTF_8));
+            }
+            return "";
+        });
+
 
     } // Fin del método main
 

@@ -234,7 +234,7 @@ public class TeacherController {
             String subjectId = req.queryParams("subject_id");
 
             if (id == null || subjectId == null || id.isEmpty() || subjectId.isEmpty()) {
-                res.redirect("/subject/create?error=" + URLEncoder.encode("Faltan datos obligatorios", "UTF-8"));
+                res.redirect("/teacher/assign?error=" + URLEncoder.encode("Faltan datos obligatorios", "UTF-8"));
                 return "";
             }
             try {
