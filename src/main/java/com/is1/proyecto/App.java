@@ -506,6 +506,7 @@ public class App {
             return new ModelAndView(model, "plans.mustache");
 
         }, new MustacheTemplateEngine());
+
         get("/teacher/unassign", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
             
@@ -662,6 +663,55 @@ public class App {
             
             return new ModelAndView(model, "final_new.mustache");
         }, engine);
+
+
+        get("/student/enroll-final", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+
+            String currentUsername = req.session().attribute("currentUserUsername");
+            if (currentUsername == null) {
+                res.redirect("/login");
+                return null;
+            }
+
+            try {
+                User user = User.findFirst("name = ?", currentUsername);
+                if (user != null) {
+                    Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+                    
+                    if (student == null) {
+                        res.redirect("/dashboard?error=" + URLEncoder.encode("Tu cuenta no está registrada como estudiante.", StandardCharsets.UTF_8));
+                        return null;
+                    }
+
+                    String today = LocalDate.now().toString();
+                    String sql = "SELECT fs.id as sheet_id, s.name as subject_name, fs.year as exam_date, fs.call " +
+                                 "FROM final_sheets fs " +
+                                 "INNER JOIN subjects s ON fs.subject_id = s.id " +
+                                 "WHERE fs.year >= ? " +
+                                 "ORDER BY fs.year ASC";
+                    
+                    List<Map> availableFinals = Base.findAll(sql, today);
+
+                    model.put("finals", availableFinals);
+                    model.put("hasFinals", !availableFinals.isEmpty());
+                }
+
+                String success = req.queryParams("success");
+                if (success != null) model.put("successMessage", success);
+                
+                String error = req.queryParams("error");
+                if (error != null) model.put("errorMessage", error);
+
+                return new ModelAndView(model, "student_enroll_final.mustache");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                model.put("errorMessage", "Error al cargar las mesas de examen.");
+                return new ModelAndView(model, "student_enroll_final.mustache");
+            }
+        }, new MustacheTemplateEngine());
+
 
 
         // --- Rutas POST para manejar envíos de formularios y APIs ---
@@ -1657,6 +1707,43 @@ public class App {
                 res.redirect("/final/new?error=" + URLEncoder.encode("Error interno al crear la mesa de examen.", StandardCharsets.UTF_8));
             }
             
+            return "";
+        });
+
+
+        post("/student/enroll-final", (req, res) -> {
+            String currentUsername = req.session().attribute("currentUserUsername");
+            if (currentUsername == null) {
+                res.redirect("/login");
+                return "";
+            }
+
+            String finalSheetIdStr = req.queryParams("final_sheet_id");
+            if (finalSheetIdStr == null || finalSheetIdStr.trim().isEmpty()) {
+                res.redirect("/student/enroll-final?error=" + URLEncoder.encode("Debe seleccionar una mesa de examen.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            try {
+                User user = User.findFirst("name = ?", currentUsername);
+                Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+                Integer finalSheetId = Integer.parseInt(finalSheetIdStr);
+
+                Long count = Base.count("final_grades", "student_id = ? AND final_sheet_id = ?", student.getId(), finalSheetId);
+                if (count > 0) {
+                    res.redirect("/student/enroll-final?error=" + URLEncoder.encode("Ya estás inscripto en esta mesa de examen.", StandardCharsets.UTF_8));
+                    return "";
+                }
+
+                Base.exec("INSERT INTO final_grades (final_sheet_id, student_id, grade) VALUES (?, ?, NULL)", finalSheetId, student.getId());
+
+                String successMsg = URLEncoder.encode("Inscripcion exitosa", StandardCharsets.UTF_8);
+                res.redirect("/student/enroll-final?success=" + successMsg);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/student/enroll-final?error=" + URLEncoder.encode("Ocurrió un error al procesar tu inscripción.", StandardCharsets.UTF_8));
+            }
             return "";
         });
 
