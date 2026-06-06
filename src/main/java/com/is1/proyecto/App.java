@@ -327,11 +327,14 @@ public class App {
             }
 
             String degree = null;
+            Integer file_code = null;
             if(role.equals("TEACHER")){ //Si es teacher, tiene título además de los otros datos
                 List<Teacher> teacher = Teacher.find("person_id = ?", currentPerson.getID());
-                degree = teacher.get(0).getDegree();         
+                degree = teacher.get(0).getDegree();       
+                file_code = teacher.get(0).getFileCode();
             }
             model.put("degree", degree); //Si lo mapea como null, el formulario lo detecta y no lo muestra (ver perfil_usuario.mustache)
+            model.put("file_code", file_code);
             return new ModelAndView(model, "perfil_usuario.mustache");
         }, new MustacheTemplateEngine());
 
