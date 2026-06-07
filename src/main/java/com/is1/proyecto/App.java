@@ -392,6 +392,7 @@ public class App {
         Boolean isAdmin = (Boolean) req.session().attribute("isAdmin");
         Boolean loggedIn = (Boolean) req.session().attribute("loggedIn");
         String currentUsername = req.session().attribute("currentUserUsername");
+        String activeRole = (String) req.session().attribute("activeRole");
 
         if (currentUsername == null || loggedIn == null || !loggedIn) {
             res.redirect("/?error=" + URLEncoder.encode("Acceso no autorizado.", StandardCharsets.UTF_8));
@@ -399,9 +400,9 @@ public class App {
             return;
         }
 
-        if (isAdmin == null || !isAdmin) {
+        if (isAdmin == null || !isAdmin || activeRole != "ADMIN") {
             System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
-            res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo el administrador puede acceder.", StandardCharsets.UTF_8));
+            res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Se requieren permisos de administrador.", StandardCharsets.UTF_8));
             halt(); 
         }
     }

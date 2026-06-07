@@ -55,6 +55,11 @@ public class DashboardController {
         model.put("isActiveAdmin", "ADMIN".equals(activeRole));
         model.put("isActiveTeacher", "TEACHER".equals(activeRole));
         model.put("isActiveStudent", "STUDENT".equals(activeRole));        
+        
+        String errorMessage = req.queryParams("error");
+        if (errorMessage != null && !errorMessage.trim().isEmpty()) {
+            model.put("errorMessage", errorMessage);
+        }
 
         return new ModelAndView(model, "dashboard.mustache");
     }
