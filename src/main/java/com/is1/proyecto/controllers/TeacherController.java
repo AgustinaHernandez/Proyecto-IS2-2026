@@ -129,7 +129,7 @@ public class TeacherController {
         return "";
     }
 
-
+    //GET teacher/unassign
     public static ModelAndView renderTeacherUnassign(Request req, Response res){
         Map<String, Object> model = new HashMap<>();
 
@@ -146,8 +146,7 @@ public class TeacherController {
         return new ModelAndView(model, "teacher_unassign.mustache");
     }
 
-
-
+    //POST teacher/unassign
     public static Object handleTeacherUnassignation(Request req, Response res){
         String id = req.queryParams("teacher_id");
         String subjectId = req.queryParams("subject_id");
@@ -206,6 +205,45 @@ public class TeacherController {
         return "";
     }
 
+    //GET teacher/modify
+    public static ModelAndView renderTeacherModify(Request req, Response res){
+        String query = req.queryParams("q");
+        
+        List<Map<String, Object>> teachers;
+
+        if (query != null && !query.trim().isEmpty()) {
+            teachers = TeacherService.searchTeachers(query);
+        } else {
+            List<Teacher> teacherModels = Teacher.findAll().include(Person.class);
+            
+            teachers = teacherModels.stream().map(t -> {
+                Map<String, Object> teacherMap = new java.util.HashMap<>();
+                
+                teacherMap.put("getId", t.getId()); 
+                
+                Person p = t.parent(Person.class);
+                if (p != null) {
+                    teacherMap.put("getDNI", p.getString("dni")); 
+                    teacherMap.put("getFullNameString", p.getString("last_name") + ", " + p.getString("first_name"));
+                } else {
+                    teacherMap.put("getDNI", "-");
+                    teacherMap.put("getFullNameString", "Sin datos");
+                }
+                
+                return teacherMap;
+            }).collect(java.util.stream.Collectors.toList());
+        }
+
+        Map<String, Object> model = Map.of(
+            "tituloPagina", "Modificar Datos Docentes",
+            "teachers", teachers,
+            "query", (query != null) ? query : "",
+            "successMessage", req.queryParamOrDefault("message", ""),
+            "errorMessage", req.queryParamOrDefault("error", "")
+        );
+
+        return new ModelAndView(model, "teacher_modify.mustache");
+    }
 
     //GET "API" para buscar profes
     public static Object handleSearchTeachersAPI(Request req, Response res) {

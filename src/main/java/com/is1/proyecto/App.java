@@ -181,6 +181,12 @@ public class App {
         //POST: Baja de Profesores
         post("/teacher/delete", TeacherController::handleDeleteTeacher);
 
+        //GET: Modificación de profesores
+        get("/teacher/modify", TeacherController::renderTeacherModify, new MustacheTemplateEngine());
+        //POST: Modificación de profesores
+
+        //POST: Guardado de datos modificados de profesores
+
         //GET: Alta de materia
         get("/subject/create", SubjectController::renderSubjectCreation, new MustacheTemplateEngine());
         //POST: Alta de materia
