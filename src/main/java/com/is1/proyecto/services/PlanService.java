@@ -2,6 +2,11 @@ package com.is1.proyecto.services;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.javalite.activejdbc.Base;
 
 import com.is1.proyecto.models.Plan;
@@ -82,8 +87,35 @@ public class PlanService {
 
     /**
      *  ---------------- LIST PLAN ------------------------------------------
-     *  (refactorizar)
      */
 
-    
+    public static List<Map<String, Object>> listPlanSubjects(String planIdStr, String subjectsQuery){
+
+        List<Map> rawSubjects = Base.findAll(subjectsQuery, planIdStr);
+
+        List<Map<String, Object>> processedSubjects = new ArrayList<>();
+        Object lastSubjectId = null;
+        Map<String, Object> previousRow = null; // Nueva variable para rastrear la fila de arriba
+
+        for (Map row : rawSubjects) {
+            Map<String, Object> newRow = new HashMap<>(row);
+            Object currentId = row.get("subj_id");
+            // Por defecto, asumo que esta fila cierra el grupo y lleva borde
+            newRow.put("has_border", true);
+            if (currentId != null && currentId.equals(lastSubjectId)) {
+                newRow.put("code", "");
+                newRow.put("name", "");
+                // la fila de arriba no va a dibujar la línea inferior
+                if (previousRow != null) {
+                    previousRow.put("has_border", false);
+                }
+            } else {
+                lastSubjectId = currentId;
+            }
+            processedSubjects.add(newRow);
+            previousRow = newRow; // Guarda la fila actual para la próxima vuelta
+        }
+        return processedSubjects;
+    }
+
 }

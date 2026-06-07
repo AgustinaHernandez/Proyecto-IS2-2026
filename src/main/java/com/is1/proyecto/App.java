@@ -15,7 +15,6 @@ import spark.template.mustache.MustacheTemplateEngine; // Motor de plantillas Mu
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 // Importaciones estándar de Java
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.List;
@@ -109,6 +108,9 @@ public class App {
         get("/plan/update", PlanController::renderUpdateForm, new MustacheTemplateEngine());
         post("/plan/update", PlanController::handleUpdatePlan);
 
+        // Consulta de plan
+        get("/plans", PlanController::renderQueryForm, new MustacheTemplateEngine());
+        post("/plans", PlanController::handleQueryPlan, new MustacheTemplateEngine());
 
         // Cambiar email (y verificación con código enviado por mail)
         get("/profile/verify-email", ProfileController::renderVerifyEmail, new MustacheTemplateEngine());
@@ -146,6 +148,11 @@ public class App {
         get("/api/teachers/search", TeacherController::handleSearchTeachersAPI);
         //POST: Alta de teacher
         post("/teacher/assign", TeacherController::handleTeacherAssignation);
+
+        //GET: Baja de estudiantes
+        get("/student/delete", StudentController::renderDeleteForm, new MustacheTemplateEngine());
+        //POST: Baja de estudiantes
+        post("/student/delete", StudentController::handleStudentDelete);
         
         
         //GET: Baja de Profesores
@@ -367,25 +374,6 @@ public class App {
         }, new MustacheTemplateEngine());
  */
 
-        get("/student/delete", (req, res) -> {
-            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
-
-            // Obtener y añadir mensaje de éxito de los query parameters
-            String successMessage = req.queryParams("message");
-            if (successMessage != null && !successMessage.isEmpty()) {
-                model.put("successMessage", successMessage);
-            }
-
-            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
-            String errorMessage = req.queryParams("error");
-            if (errorMessage != null && !errorMessage.isEmpty()) {
-                model.put("errorMessage", errorMessage);
-            }
-
-            // Renderiza la plantilla 'student_del.mustache' con los datos del modelo.
-            return new ModelAndView(model, "student_del.mustache");
-        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
-
         get("/student/create", (req, res) -> {
             Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
 
@@ -458,15 +446,7 @@ public class App {
             return new ModelAndView(model, "enrollment.mustache");
         }, new MustacheTemplateEngine());
 
-        get("/plans",(req, res) -> { 
-            Map<String, Object> model = new HashMap<>();
-            List<Plan> plans = Plan.findAll().include(Career.class);
-
-            model.put("plans", plans);
-
-            return new ModelAndView(model, "plans.mustache");
-
-        }, new MustacheTemplateEngine());
+        
         get("/teacher/unassign", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
             
@@ -632,37 +612,71 @@ public class App {
             return "";
         });
 
-        post("/student/remove", (req, res) -> {
-            String id = req.queryParams("id");
-
-            if(id == null || id.isEmpty()){
-                res.redirect("/student/delete?error=" + URLEncoder.encode("Faltan datos obligatorios", "UTF-8"));
-                return "";
-            }
-
-            try {
-                Base.openTransaction();
-                Student st = Student.findById(Integer.parseInt(id));
-                if(st != null && st.delete()){
-                    Base.commitTransaction();
-                    String successMsg = URLEncoder.encode("Estudiante ["+id+"] eliminado correctamente.",StandardCharsets.UTF_8);
-                    res.redirect("/student/delete?message= " + successMsg);
-                    return "";
-
-                } else {
-                    Base.rollbackTransaction();
-                    res.redirect("/student/delete?error=" + URLEncoder.encode("Error: Código inválido", "UTF-8"));
-                    return "";
-                }
-
-            } catch(Exception e){
-                Base.rollbackTransaction();
-                e.printStackTrace();
-                res.redirect("/student/delete?error=" + URLEncoder.encode("Error", "UTF-8"));
-            }
-            return "";
-        });
         
+/*
+        post("/plan/new", (req, res) -> {
+                     
+            String careerId = req.queryParams("career_id"); // id de la carrera seleccionada
+            String statePlan = req.queryParams("state");   //estado del plan
+            String versionPlan = req.queryParams("version"); // version del plan
+           
+            // Validaciones básicas: campos no pueden ser nulos o vacíos.
+
+             if (careerId == null || careerId.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";
+            }
+
+             if (statePlan == null || statePlan.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";
+
+            }
+
+            if (versionPlan == null || versionPlan.isEmpty()){
+               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
+               res.redirect("/career/create?error=" + errorMsg);
+               return "";  
+
+            }
+
+            //Principal
+            try {
+                // Intenta crear y guardar el nuevo plan de estudios  en la base de datos.
+                
+                Base.openTransaction();  // Iniciamos la transaccion
+
+                Plan np = new Plan(); // Crea una nueva instancia del modelo PLan.
+                
+                np.set("career_id",careerId);
+                np.set("state",statePlan);
+                np.set("version",versionPlan);
+                np.saveIt();
+
+                Base.commitTransaction();               
+
+                res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
+                // Redirige al formulario de creación con un mensaje de éxito.
+                String successMsg = URLEncoder.encode("Plan "+versionPlan+" registrado correctamente.",StandardCharsets.UTF_8);
+                res.redirect("/plan/new?successMessage="+successMsg);
+                return ""; // Retorna una cadena vacía.
+
+
+           } catch (Exception e) {
+               // Si ocurre cualquier error durante la operación de DB (ej. código de carrera duplicado),
+               // se captura aquí y se redirige con un mensaje de error.
+               Base.rollbackTransaction(); // Si falla algo deshace
+               e.printStackTrace(); // Imprime el stack trace para depuración.
+               res.status(500); // Código de estado HTTP 500 (Internal Server Error).
+               String errorMsg = URLEncoder.encode("ERROR: id de plan de carrera ya existente o error interno.", StandardCharsets.UTF_8);
+               res.redirect("/plan/new?errorMessage="+errorMsg);
+               return ""; // Retorna una cadena vacía.
+           }
+        });
+ */
+
         post("/student/new", (req, res) -> {
             String firstname = req.queryParams("firstname").trim();
             String lastname = req.queryParams("lastname").trim();
@@ -842,56 +856,6 @@ public class App {
             res.redirect("/enrollment");
             return null;
         });
-
-        post("/plans", (req, res) -> {
-            String planId = req.queryParams("plan_id");
-            Map<String, Object> model = new HashMap<>();
-            Plan plan = Plan.findById(planId);
-
-            model.put("plan", plan);
-            
-            //Materias pertenecientes al plan, sus correlativas y condiciones para cursar y rendir
-            String subjectsQuery = 
-                "SELECT s.id AS subj_id, s.code, s.name, corr.code AS correlative_code, " +
-                    "c.course_condition, c.exam_condition " +
-                "FROM subject_belongs_plan sb " +
-                "INNER JOIN subjects s ON s.id = sb.subject_id " +
-                "LEFT JOIN conditions c ON c.subject_id = sb.subject_id " +
-                "LEFT JOIN subjects corr ON c.correlative_id = corr.id " +
-                "WHERE sb.plan_id = ? " +
-                "ORDER BY s.code, corr.code"; 
-
-            List<Map> rawSubjects = Base.findAll(subjectsQuery, planId);
-
-            List<Map<String, Object>> processedSubjects = new ArrayList<>();
-            Object lastSubjectId = null;
-            Map<String, Object> previousRow = null; // Nueva variable para rastrear la fila de arriba
-
-            for (Map row : rawSubjects) {
-                Map<String, Object> newRow = new HashMap<>(row);
-                Object currentId = row.get("subj_id");
-                // Por defecto, asumo que esta fila cierra el grupo y lleva borde
-                newRow.put("has_border", true);
-                if (currentId != null && currentId.equals(lastSubjectId)) {
-                    newRow.put("code", "");
-                    newRow.put("name", "");
-                    // la fila de arriba no va a dibujar la línea inferior
-                    if (previousRow != null) {
-                        previousRow.put("has_border", false);
-                    }
-                } else {
-                    lastSubjectId = currentId;
-                }
-                processedSubjects.add(newRow);
-                previousRow = newRow; // Guarda la fila actual para la próxima vuelta
-            }
-            model.put("subjects", processedSubjects);
-
-            return new ModelAndView(model, "plan_details.mustache");
-        }, new MustacheTemplateEngine());
-
-
-
 
         post("/teacher/unassign", (req, res) -> {
             

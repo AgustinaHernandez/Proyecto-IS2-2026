@@ -9,6 +9,7 @@ import spark.Response;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -105,8 +106,40 @@ public class PlanController {
 
     /**
      *  ---------------- LIST PLAN ------------------------------------------
-     *  (refactorizar)
      */
 
+    // GET
+    public static ModelAndView renderQueryForm(Request req, Response res) {
+        // Obtenemos los planes con sus carreras para la vista
+        List<Plan> plans = Plan.findAll().include(Career.class);
+        Map<String, Object> model = new HashMap<>();
+        model.put("plans", plans);
+        
+        return new ModelAndView(model, "plans.mustache");
+    }
+
+    // POST
+    public static ModelAndView handleQueryPlan(Request req, Response res) {
+        String planId = req.queryParams("plan_id");
+        Map<String, Object> model = new HashMap<>();
+        Plan plan = Plan.findById(planId);
+
+        model.put("plan", plan);
+        //Materias pertenecientes al plan, sus correlativas y condiciones para cursar y rendir
+        String subjectsQuery = 
+            "SELECT s.id AS subj_id, s.code, s.name, corr.code AS correlative_code, " +
+                "c.course_condition, c.exam_condition " +
+            "FROM subject_belongs_plan sb " +
+            "INNER JOIN subjects s ON s.id = sb.subject_id " +
+            "LEFT JOIN conditions c ON c.subject_id = sb.subject_id " +
+            "LEFT JOIN subjects corr ON c.correlative_id = corr.id " +
+            "WHERE sb.plan_id = ? " +
+            "ORDER BY s.code, corr.code"; 
+
+        List<Map<String, Object>> processedSubjects = PlanService.listPlanSubjects(planId, subjectsQuery);
+        model.put("subjects", processedSubjects);
+
+        return new ModelAndView(model, "plan_details.mustache");
+    }
 
 }
