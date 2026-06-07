@@ -82,8 +82,8 @@ INSERT INTO conditions (subject_id, correlative_id, course_condition, exam_condi
 (3, 1, 'APROBADA', 'APROBADA'),
 (3, 2, 'REGULAR', 'APROBADA');
 
-INSERT INTO grade_sheets (subject_id, student_id, year) VALUES 
-(1, 1, 2023);
+INSERT INTO grade_sheets (subject_id, year) VALUES 
+(1, 2023);
 
 INSERT INTO statuses (grade_sheet_id, student_id, initial_condition, final_condition) VALUES 
 (1, 1, 'INSCRIPTO', 'APROBADO'),

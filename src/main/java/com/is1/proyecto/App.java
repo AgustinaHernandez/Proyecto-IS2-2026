@@ -15,6 +15,7 @@ import spark.template.mustache.MustacheTemplateEngine; // Motor de plantillas Mu
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Year;
 import java.util.ArrayList;
 // Importaciones estándar de Java
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
@@ -70,6 +71,9 @@ public class App {
         before("/career/create", (req, res) -> checkAdminAccess(req, res));
         before("/career/new", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/unassign", (req, res) -> checkAdminAccess(req, res));
+        before("/grade-enrollments", (req, res) -> checkStudentAccess(req, res));
+        before("/final-enrollments", (req, res) -> checkStudentAccess(req, res));
+        before("/academic-performance", (req, res) -> checkStudentAccess(req, res));
 
         // --- Filtro 'after-after' para cerrar la conexión a la base de datos pase lo que pase---
         afterAfter("/*", (req, res) -> {
@@ -128,7 +132,7 @@ public class App {
             Boolean loggedIn = req.session().attribute("loggedIn");
             
             if (currentUsername == null || loggedIn == null || !loggedIn) {
-                System.out.println("DEBUG: Acceso no autorizado a /change-password. Redirigiendo a /login.");
+                System.out.println("DEBUG: Acceso no autorizado a /change-password. Redirigiendo a /.");
                 res.redirect("/?error=Acceso+no+autorizado.");
                 return null;
             }
@@ -152,7 +156,7 @@ public class App {
 
         get("/profile/verify-email", (req, res) -> {
             if (req.session().attribute("userId") == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
 
@@ -187,7 +191,7 @@ public class App {
             // Si no hay un nombre de usuario en la sesión, la bandera es nula o falsa,
             // significa que el usuario no está logueado o su sesión expiró.
             if (currentUsername == null || loggedIn == null || !loggedIn) {
-                System.out.println("DEBUG: Acceso no autorizado a /dashboard. Redirigiendo a /login.");
+                System.out.println("DEBUG: Acceso no autorizado a /dashboard. Redirigiendo a /.");
                 // Redirige al login con un mensaje de error.
                 res.redirect("/?error=Acceso no autorizado.");
                 return null; // Importante retornar null después de una redirección.
@@ -224,6 +228,7 @@ public class App {
             model.put("isActiveAdmin", "ADMIN".equals(activeRole));
             model.put("isActiveTeacher", "TEACHER".equals(activeRole));
             model.put("isActiveStudent", "STUDENT".equals(activeRole));        
+            model.put("hasNoRole", "NONE".equals(activeRole)); //Usado en renderización de materias en dashboard
             // 3. Renderiza la plantilla del dashboard con el nombre de usuario.
             return new ModelAndView(model, "dashboard.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
@@ -233,7 +238,7 @@ public class App {
             
             // Verificar sesión (opcional, pero recomendado)
             if (req.session().attribute("loggedIn") == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
             model.put("tituloPagina", "Configuración");
@@ -247,7 +252,7 @@ public class App {
             // La cookie JSESSIONID en el navegador también será gestionada para invalidarse.
             req.session().invalidate();
 
-            System.out.println("DEBUG: Sesión cerrada. Redirigiendo a /login.");
+            System.out.println("DEBUG: Sesión cerrada. Redirigiendo a /.");
 
             // Redirige al usuario a la página de login con un mensaje de éxito.
             res.redirect("/");
@@ -323,11 +328,14 @@ public class App {
             }
 
             String degree = null;
+            Integer file_code = null;
             if(role.equals("TEACHER")){ //Si es teacher, tiene título además de los otros datos
                 List<Teacher> teacher = Teacher.find("person_id = ?", currentPerson.getID());
-                degree = teacher.get(0).getDegree();         
+                degree = teacher.get(0).getDegree();       
+                file_code = teacher.get(0).getFileCode();
             }
             model.put("degree", degree); //Si lo mapea como null, el formulario lo detecta y no lo muestra (ver perfil_usuario.mustache)
+            model.put("file_code", file_code);
             return new ModelAndView(model, "perfil_usuario.mustache");
         }, new MustacheTemplateEngine());
 
@@ -445,7 +453,7 @@ public class App {
             Object userIdAttr = req.session().attribute("userId");
             if (userIdAttr == null) {
                 req.session().attribute("error", "Acceso no autorizado.");
-                res.redirect("/login"); 
+                res.redirect("/"); 
                 return null;
             }
             
@@ -460,7 +468,7 @@ public class App {
             
             User user = User.findById(userIdAttr);
             if (user == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
             
@@ -527,7 +535,177 @@ public class App {
             return new ModelAndView(model, "teacher_unassign.mustache");
         }, new MustacheTemplateEngine());
 
+        get("/grade-enrollments", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            Object userId = req.session().attribute("userId");
+            User user = User.findById(userId);
+            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+        
+            String sharedHead = "SELECT s.code, s.name, st.initial_condition";
 
+            String sharedBody = " FROM subjects s " +
+                                "INNER JOIN grade_sheets g ON s.id = g.subject_id " +
+                                "INNER JOIN statuses st ON g.id = st.grade_sheet_id " +
+                                "WHERE st.student_id = ? AND st.final_condition ";
+
+            String currSubjectsQuery = sharedHead + sharedBody + "= 'INSCRIPTO'";
+
+            String gradeSubjectsQuery = sharedHead + ", g.year, st.final_condition" + sharedBody + "<> 'INSCRIPTO'";
+
+            List<Map> currSubjects = Base.findAll(currSubjectsQuery, student.getId());
+            List<Map> gradeSubjects = Base.findAll(gradeSubjectsQuery, student.getId());
+
+            model.put("currSubjects", currSubjects);
+            model.put("gradeSubjects", gradeSubjects);
+            model.put("currentYear", Year.now().getValue());
+            return new ModelAndView(model, "grade_enrollments.mustache");
+        }, new MustacheTemplateEngine());
+
+        get("/final-enrollments", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            Object userId = req.session().attribute("userId");
+            User user = User.findById(userId);
+            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+
+            String finalSubjectsQuery = "SELECT s.code, s.name, fs.call, fs.year, fg.grade " + 
+                                "FROM subjects s " + 
+                                "INNER JOIN final_sheets fs ON s.id = fs.subject_id " + 
+                                "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id " + 
+                                "WHERE fg.student_id = ?";
+            
+            List<Map> finalSubjects = Base.findAll(finalSubjectsQuery, student.getId());
+            model.put("finalSubjects", finalSubjects);
+            return new ModelAndView(model, "final_enrollments.mustache");
+        }, new MustacheTemplateEngine());
+
+        get("/academic-performance", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+            Object userId = req.session().attribute("userId");
+            User user = User.findById(userId);
+            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+
+            List<Enrolled_Plan> enrolled = Enrolled_Plan.where("student_id = ?", student.getId()).include(Plan.class);
+
+            model.put("enrolled", enrolled);
+            return new ModelAndView(model, "enrolled_careers.mustache");
+        }, new MustacheTemplateEngine());
+        // GET: Muestra el formulario de inscripción a la carrera/plan
+        get("/student/enroll-plan", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+
+            String currentUsername = req.session().attribute("currentUserUsername");
+            if (currentUsername == null) {
+                res.redirect("/login");
+                return null;
+            }
+
+            try {
+                //Verificar que el usuario sea un estudiante
+                User user = User.findFirst("name = ?", currentUsername);
+                if (user != null) {
+                    Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+                    
+                    if (student == null) {
+                        res.redirect("/dashboard?error=" + URLEncoder.encode("Tu cuenta no está registrada como estudiante.", StandardCharsets.UTF_8));
+                        return null;
+                    }
+
+                    //Traer solo los planes que estén VIGENTE o A TERMINO
+                    List<Plan> availablePlans = Plan.where("state IN ('VIGENTE', 'A TERMINO')");
+                    List<Map<String, Object>> planesList = new ArrayList<>();
+
+                    for (Plan plan : availablePlans) {
+                        Career career = Career.findById(plan.get("career_id"));
+                        if (career != null) {
+                            Map<String, Object> planMap = new HashMap<>();
+                            planMap.put("planId", plan.getId());
+                            String displayName = career.getString("name") + " - Plan " + plan.get("version") + " (" + plan.getString("state") + ")";
+                            planMap.put("displayName", displayName);
+                            
+                            planesList.add(planMap);
+                        }
+                    }
+
+                    model.put("plans", planesList);
+                    model.put("hasPlans", !planesList.isEmpty());
+                }
+
+                String success = req.queryParams("success");
+                if (success != null) model.put("successMessage", success);
+                
+                String error = req.queryParams("error");
+                if (error != null) model.put("errorMessage", error);
+
+                return new ModelAndView(model, "student_enroll_plan.mustache");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                model.put("errorMessage", "Error al cargar los planes de estudio.");
+                return new ModelAndView(model, "student_enroll_plan.mustache");
+            }
+        }, engine);
+
+
+        post("/academic-performance", (req, res) -> { //REUBICAR
+            Map<String, Object> model = new HashMap<>();
+            String planId = req.queryParams("plan_id");
+            Object userId = req.session().attribute("userId");
+            User user = User.findById(userId);
+            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+            String subjectsQuery = "SELECT s.code, s.name, fs.year, fg.grade " + 
+                                "FROM (SELECT * FROM enrolled_plan WHERE plan_id = ? AND student_id = ?) AS ep " + //Subconsulta para plan seleccionado
+                                "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " + //Materias del plan
+                                "INNER JOIN enrolled_subject es ON es.student_id = ep.student_id AND sbp.subject_id = es.subject_id " + //Materias del alumno y del plan
+                                "INNER JOIN subjects s ON es.subject_id = s.id " + //Materias (para sacar los datos)
+                                "INNER JOIN final_sheets fs ON s.id = fs.subject_id " +  
+                                "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id " + 
+                                "WHERE fg.student_id = ?";
+
+            String mode = req.queryParams("mode");
+            String gradeMode = "";
+            boolean both = false;
+            if(mode.equals("aprobadas")){
+                gradeMode = " AND fg.grade >= 5";
+            } else if (mode.equals("desaprobadas")){
+                gradeMode = " AND fg.grade < 5";
+            } else {
+                both = true;
+            }
+            
+            List<Map> subjects = Base.findAll(subjectsQuery + gradeMode, planId, student.getId(), student.getId());
+            List<Map> allSubjects = Base.findAll(subjectsQuery, planId, student.getId(), student.getId());
+
+            float totalAverage = 0;
+            float approvedAverage = 0;
+            int approvedSubjects = 0;
+            for(Map m : allSubjects){
+                Object rawGrade = m.get("grade");
+                float grade = ((Number) rawGrade).floatValue();
+                if(grade >= 5){
+                    approvedAverage += grade;
+                    approvedSubjects++;
+                }
+                totalAverage += grade;
+            }
+
+            if(!allSubjects.isEmpty()){
+                totalAverage /= allSubjects.size();
+            } //Si no hay materias, el promedio no se muestra, por ende, no importa cómo haya quedado
+            if(approvedSubjects > 0){
+                approvedAverage /= approvedSubjects;
+            } else {
+                approvedAverage = 0;
+            }
+
+            model.put("subjects", subjects);
+            model.put("hasSubjects", !allSubjects.isEmpty());
+            model.put("mode", mode);
+            model.put("both", both);
+            model.put("totalAverage", totalAverage);
+            model.put("approvedAverage", approvedAverage);
+            return new ModelAndView(model, "academic_performance.mustache");
+        }, new MustacheTemplateEngine());
+        
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
 
@@ -603,6 +781,7 @@ public class App {
                 
                 System.out.println("DEBUG: Login exitoso para la cuenta: " + username);
                 System.out.println("DEBUG: ID de Sesión: " + req.session().id());
+                System.out.println("DEBUG: Usuario con role: " + req.session().attribute("activeRole"));
 
                 model.put("username", username); // Añade el nombre de usuario al modelo para el dashboard.
                 model.put("isAdmin", isAdmin);
@@ -1161,7 +1340,7 @@ public class App {
             String activeRole = req.session().attribute("activeRole");
 
             if (userIdAttr == null || !"STUDENT".equals(activeRole)) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
 
@@ -1177,7 +1356,7 @@ public class App {
             Subject subject = Subject.findById(subjectIdParam);
 
             if (student == null || subject == null) {
-                req.session().attribute("error", "Error de consistencia: Alumno o materia no encontrados.");
+                req.session().attribute("error", "Error: Alumno o materia no encontrados.");
                 res.redirect("/enrollment");
                 return null;
             }
@@ -1192,19 +1371,30 @@ public class App {
             try {
                 Base.openTransaction();
 
-                // Buscamos el acta (grade_sheet) de cursado de la materia para el ciclo lectivo 2026
-                String gsSql = "SELECT id FROM grade_sheets WHERE subject_id = ? AND year = ? LIMIT 1";
-                Object gradeSheetId = Base.firstCell(gsSql, subject.getId(), 2026);
+                //Obtener el verdadero año actual
+                int currentYear = Year.now().getValue();
 
+                //Buscar el acta de cursado de la materia para el ciclo lectivo actual
+                String gsSql = "SELECT id FROM grade_sheets WHERE subject_id = ? AND year = ? LIMIT 1";
+                Object gradeSheetId = Base.firstCell(gsSql, subject.getId(), currentYear);
+
+                //Si la gradesheet no existe, se crea en el momento 
+                if (gradeSheetId == null) {
+                    Base.exec("INSERT INTO grade_sheets (subject_id, year) VALUES (?, ?)", subject.getId(), currentYear);
+                    //Recuperamos el ID que se le acaba de asignar
+                    gradeSheetId = Base.firstCell(gsSql, subject.getId(), currentYear);
+                }
+
+                //Insertar el estado del alumno a la planilla
                 Base.exec("INSERT INTO statuses (grade_sheet_id, student_id, initial_condition, final_condition) VALUES (?, ?, ?, ?)", 
                           gradeSheetId, student.getId(), "INSCRIPTO", "INSCRIPTO");
 
                 Base.commitTransaction();
-                req.session().attribute("success", "¡Te has inscripto con éxito a " + subject.getString("name") + "!");
+                req.session().attribute("success", "¡Te inscribiste con éxito a " + subject.getString("name") + "!");
                 
             } catch (Exception e) {
                 Base.rollbackTransaction();
-                req.session().attribute("error", "Ocurrió un error inesperado en el servidor al procesar el alta.");
+                req.session().attribute("error", "Ocurrió un error en el servidor al procesar la solicitud.");
                 e.printStackTrace();
             }
 
@@ -1327,7 +1517,7 @@ public class App {
 
             // Verificaciones
             if (userIdAttr == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return "";
             }
 
@@ -1370,7 +1560,7 @@ public class App {
             Object userIdAttr = req.session().attribute("userId");
 
             if (userIdAttr == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return "";
             }
 
@@ -1396,6 +1586,47 @@ public class App {
             return "";
         });
 
+        // POST: Inscripción a plan de estudio
+        post("/student/enroll-plan", (req, res) -> {
+            String currentUsername = req.session().attribute("currentUserUsername");
+            if (currentUsername == null) {
+                res.redirect("/login");
+                return "";
+            }
+
+            String planIdStr = req.queryParams("plan_id");
+            if (planIdStr == null || planIdStr.trim().isEmpty()) {
+                res.redirect("/student/enroll-plan?error=" + URLEncoder.encode("Debe seleccionar un plan de estudios.", StandardCharsets.UTF_8));
+                return "";
+            }
+
+            try {
+                User user = User.findFirst("name = ?", currentUsername);
+                Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+                Integer planId = Integer.parseInt(planIdStr);
+
+                //Ver si ya está inscripto en ese plan
+                Long count = Base.count("enrolled_plan", "student_id = ? AND plan_id = ?", student.getId(), planId);
+                
+                if (count > 0) {
+                    res.redirect("/student/enroll-plan?error=" + URLEncoder.encode("Ya estás inscripto en esta carrera y plan.", StandardCharsets.UTF_8));
+                    return "";
+                }
+
+                //Realizar la inscripción
+                //Se usa Base.exec() porque enrolled_plan usa una PK compuesta y no tiene columna 'id'
+                Base.exec("INSERT INTO enrolled_plan (student_id, plan_id) VALUES (?, ?)", student.getId(), planId);
+
+                String successMsg = URLEncoder.encode("¡Inscripción exitosa a la carrera!", StandardCharsets.UTF_8);
+                res.redirect("/student/enroll-plan?success=" + successMsg);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/student/enroll-plan?error=" + URLEncoder.encode("Ocurrió un error al procesar tu inscripción.", StandardCharsets.UTF_8));
+            }
+            return "";
+        });
+
     } // Fin del método main
 
     /**
@@ -1416,6 +1647,28 @@ public class App {
         if (isAdmin == null || !isAdmin) {
             System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
             res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo el administrador puede acceder.", StandardCharsets.UTF_8));
+            halt(); 
+        }
+    }
+
+    /**
+     * Filtro de verificación de acceso a estudiantes.
+     * Solo permite el acceso si el usuario tiene el flag 'isStudent' en true en la sesión.
+     */
+    private static void checkStudentAccess(spark.Request req, spark.Response res) {
+        Boolean isStudent = (Boolean) req.session().attribute("isStudent");
+        Boolean loggedIn = (Boolean) req.session().attribute("loggedIn");
+        String currentUsername = req.session().attribute("currentUserUsername");
+
+        if (currentUsername == null || loggedIn == null || !loggedIn) {
+            res.redirect("/?error=" + URLEncoder.encode("Acceso restringido. Debes iniciar sesión.", StandardCharsets.UTF_8));
+            halt(); 
+            return;
+        }
+
+        if (isStudent == null || !isStudent) {
+            System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
+            res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Solo los estudiantes pueden acceder.", StandardCharsets.UTF_8));
             halt(); 
         }
     }

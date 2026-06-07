@@ -1,4 +1,4 @@
-package com.is1.proyecto.models;             // Laburando
+package com.is1.proyecto.models;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,7 +8,7 @@ import org.javalite.activejdbc.Model;
 import org.javalite.activejdbc.annotations.BelongsTo;
 import org.javalite.activejdbc.annotations.Table;
 
-@Table("students") // Igual que en 'Teacher'
+@Table("students")
 @BelongsTo(parent = Person.class, foreignKeyName = "id")
 
 public class Student extends Model {
@@ -56,8 +56,6 @@ public class Student extends Model {
      *  Devuelve las materias disponibles para inscribirse 
      */
     public List<Subject> getAvailableSubjectsToEnroll() {
-        // 1. Obtener el plan actual del alumno a través de la tabla intermedia enrolled_plan
-        // Nota: Si usás una clase modelo EnrolledPlan, podés cambiar esto. Si no, usamos SQL crudo por eficiencia:
         String planSql = "SELECT plan_id FROM enrolled_plan WHERE student_id = ? LIMIT 1";
         Object planIdObj = Base.firstCell(planSql, this.getId());
         
@@ -150,11 +148,6 @@ public class Student extends Model {
         return result != null && ((Number) result).longValue() > 0;
     }
 
-
-    
-// Atributos propios de Student
-
-    //Student no tiene atributos propios distintos de Person, no tiene sentido
 
     public String getFullNameString() {
         return getFirstName() + " " + getLastName();

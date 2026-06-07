@@ -6,6 +6,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,8 @@ import java.util.concurrent.CompletableFuture;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.is1.proyecto.models.Person;
+import com.is1.proyecto.models.Status;
+import com.is1.proyecto.models.Student;
 import com.is1.proyecto.models.Subject;
 import com.is1.proyecto.models.Teacher;
 import com.is1.proyecto.models.User;
@@ -351,6 +354,142 @@ public class TeacherController {
 
             return new ModelAndView(model, "teacher_modify.mustache");
         }, engine);
+        get("/teacher/select-subject", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+
+            //Comprobar que el teacher está logueado y obtener su user
+            String currentUsername = req.session().attribute("currentUserUsername");
+            if (currentUsername == null) {
+                res.redirect("/");
+                return null;
+            }
+
+            try {
+                //Buscarlo a partir de su user
+                User user = User.findFirst("name = ?", currentUsername);
+                if (user != null) {
+                    Teacher teacher = Teacher.findFirst("person_id = ?", user.get("person_id"));
+                    if (teacher != null) {
+                        List<Subject> teacherSubjects = Subject.findBySQL(
+                            "SELECT s.* FROM subjects s INNER JOIN teaches t ON s.id = t.subject_id WHERE t.teacher_id = ?", 
+                            teacher.getId()
+                        );
+                        model.put("subjects", teacherSubjects);
+                        model.put("hasSubjects", !teacherSubjects.isEmpty());
+                    }
+                }
+
+                String error = req.queryParams("error");
+                if (error != null && !error.isEmpty()) {
+                    model.put("errorMessage", error);
+                }
+
+                return new ModelAndView(model, "teacher_subject_selector.mustache");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                model.put("errorMessage", "Ocurrió un error al cargar tus materias.");
+                return new ModelAndView(model, "teacher_subject_selector.mustache");
+            }
+        }, engine);
+
+        get("/teacher/subject-students", (req, res) -> {
+            Map<String, Object> model = new HashMap<>();
+
+            //Comprobar que seleccionó una materia
+            String subjectIdStr = req.queryParams("subject_id");
+            if (subjectIdStr == null || subjectIdStr.trim().isEmpty()) {
+                res.redirect("/teacher/select-subjects?error=" + URLEncoder.encode("Seleccioná una materia primero.", StandardCharsets.UTF_8));
+                return null;
+            }
+
+            try {
+                Integer subjectId = Integer.parseInt(subjectIdStr);
+                
+                Subject subject = Subject.findById(subjectId);
+                if (subject != null) {
+                    model.put("subjectName", subject.getString("name"));
+                }
+                
+                model.put("subjectId", subjectIdStr);
+
+                String query = req.queryParams("q");
+                List<Student> students;
+                
+                if (query != null && !query.isEmpty()) {
+                    model.put("query", query);
+                    String search = "%" + query.trim() + "%";
+                    
+                    //Une students -> statuses -> grade_sheets para filtrar por materia
+                    //Se usa DISTINCT por si un alumno recursó y aparece en más de una planilla
+                    String sql = "SELECT DISTINCT s.* FROM students s " +
+                                "INNER JOIN persons p ON s.person_id = p.id " +
+                                "INNER JOIN statuses st ON s.id = st.student_id " +
+                                "INNER JOIN grade_sheets gs ON st.grade_sheet_id = gs.id " +
+                                "WHERE gs.subject_id = ? " +
+                                "AND (p.first_name LIKE ? OR p.last_name LIKE ? OR CAST(p.dni AS TEXT) LIKE ?)";
+                    
+                    students = Student.findBySQL(sql, subjectId, search, search, search);
+                } else {
+                    //trae todos los alumnos que estén en alguna gradesheet de la materia
+                    String sql = "SELECT DISTINCT s.* FROM students s " +
+                                "INNER JOIN statuses st ON s.id = st.student_id " +
+                                "INNER JOIN grade_sheets gs ON st.grade_sheet_id = gs.id " +
+                                "WHERE gs.subject_id = ?";
+                                
+                    students = Student.findBySQL(sql, subjectId);
+                }
+
+                List<Map<String, Object>> listaDeAlumnosArmada = new ArrayList<>();
+                
+                for (Student student : students) {
+                    Person person = Person.findById(student.get("person_id"));
+                    if (person != null) {
+                        Map<String, Object> alumnoMap = new HashMap<>();
+                        
+                        alumnoMap.put("getDNI", person.get("dni"));
+                        alumnoMap.put("getFullNameString", person.getString("last_name") + ", " + person.getString("first_name"));
+                        alumnoMap.put("getEmail", person.getString("email") != null ? person.getString("email") : "Sin email");
+                        
+                        String condicion = "Desconocido";
+                        
+                        //Se busca el estado más reciente del alumno en la materia
+                        //Después ordenamos por el año de la gradesheet de forma descendente y tomamos el primero
+                        String statusSql = "SELECT st.* FROM statuses st " +
+                                        "INNER JOIN grade_sheets gs ON st.grade_sheet_id = gs.id " +
+                                        "WHERE gs.subject_id = ? AND st.student_id = ? " +
+                                        "ORDER BY gs.year DESC";
+                                        
+                        List<Status> historialEstados = Status.findBySQL(statusSql, subjectId, student.getId());
+                        
+                        if (!historialEstados.isEmpty()) {
+                            Status estadoMasReciente = historialEstados.get(0);
+                            condicion = estadoMasReciente.getString("final_condition") != null ? 
+                                        estadoMasReciente.getString("final_condition") : 
+                                        estadoMasReciente.getString("initial_condition");
+                        }
+                        
+                        alumnoMap.put("getCondition", condicion);
+                        listaDeAlumnosArmada.add(alumnoMap);
+                    }
+                }
+
+                model.put("students", listaDeAlumnosArmada);
+
+                String success = req.queryParams("success");
+                if (success != null) model.put("successMessage", success);
+                
+                String error = req.queryParams("error");
+                if (error != null) model.put("errorMessage", error);
+
+                return new ModelAndView(model, "teacher_students.mustache");
+
+            } catch (NumberFormatException e) {
+                res.redirect("/teacher/select-subjects?error=" + URLEncoder.encode("Materia inválida.", StandardCharsets.UTF_8));
+                return null;
+            }
+        }, engine);
+    }
 
         post("/teacher/modify", (req, res) -> {
             // 1. Obtenemos el ID del docente

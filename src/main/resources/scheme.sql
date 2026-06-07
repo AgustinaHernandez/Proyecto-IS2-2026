@@ -172,11 +172,9 @@ DROP TABLE  IF EXISTS grade_sheets;
 CREATE TABLE grade_sheets (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     subject_id INTEGER NOT NULL,
-    student_id INTEGER NOT NULL,
     year INTEGER NOT NULL,
 
-    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
-    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id)
+    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id)
 );
 
 DROP TABLE  IF EXISTS statuses;
@@ -245,48 +243,3 @@ CREATE TABLE enrollment_register (
     CONSTRAINT fk_plan FOREIGN KEY (plan_id) REFERENCES plans (id),
     CONSTRAINT pk_enrollment_register PRIMARY KEY (plan_id, student_id, year)
 );
-
-DROP TABLE  IF EXISTS period_register;
-
-CREATE TABLE period_register (
-    subject_id INTEGER NOT NULL,
-    teacher_id INTEGER NOT NULL,
-    period varchar(25) NOT NULL,
-    position varchar(25) NOT NULL,
-    participation varchar(25) NOT NULL,
-    date DATE NOT NULL,
-
-
-    CONSTRAINT chk_period CHECK (
-        period IN (
-            '1 Cuatrimestre', 
-            '2 Cuatrimestre', 
-            '1 Cuatrimestre 1 Bimestre', 
-            '1 Cuatrimestre 2 Bimestre', 
-            '2 Cuatrimestre 1 Bimestre', 
-            '2 Cuatrimestre 2 Bimestre',
-            'Anual'
-        )
-    ),
-
-    CONSTRAINT chk_position CHECK (
-        position IN (
-            'Profesor', 
-            'JTP', 
-            'Ayudante de primera'
-        )
-    ),
-    
-    CONSTRAINT chk_participation CHECK (
-        participation IN (
-            'Responsable', 
-            'Colaborador'
-        )
-    ),
-
-    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
-    CONSTRAINT fk_teacher FOREIGN KEY (teacher_id) REFERENCES teachers (id),
-    CONSTRAINT pk_period_register PRIMARY KEY (subject_id, teacher_id)
-);
-
-
