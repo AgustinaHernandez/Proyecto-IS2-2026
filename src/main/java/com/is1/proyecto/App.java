@@ -246,7 +246,7 @@ public class App {
             model.put("enrolled", enrolled);
             return new ModelAndView(model, "choose_subjects.mustache");
         }, new MustacheTemplateEngine());
-
+/* 
         get("/academic-performance", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
             Object userId = req.session().attribute("userId");
@@ -258,7 +258,7 @@ public class App {
             model.put("enrolled", enrolled);
             return new ModelAndView(model, "enrolled_careers.mustache");
         }, new MustacheTemplateEngine());
-        
+        */
         // GET: Muestra el formulario de inscripción a la carrera/plan
         get("/student/enroll-plan", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
@@ -446,7 +446,7 @@ public class App {
         }, new MustacheTemplateEngine());
 
 
-
+/*
         post("/academic-performance", (req, res) -> { //REUBICAR
             Map<String, Object> model = new HashMap<>();
             String planId = req.queryParams("plan_id");
@@ -506,7 +506,7 @@ public class App {
             model.put("approvedAverage", approvedAverage);
             return new ModelAndView(model, "academic_performance.mustache");
         }, new MustacheTemplateEngine());
-        
+        */
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
         //GET: /logout
