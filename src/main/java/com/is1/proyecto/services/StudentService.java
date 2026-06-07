@@ -1,5 +1,10 @@
 package com.is1.proyecto.services;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+
 import org.javalite.activejdbc.Base;
 import org.mindrot.jbcrypt.BCrypt;
 
@@ -17,6 +22,15 @@ import com.is1.proyecto.utils.PasswordGenerator;
 
 
 public class StudentService {
+
+    public static class PerformanceQueryResult {
+        public List<Map> subjects;
+        public List<Map> allSubjects;
+        public float totalAverage;
+        public float approvedAverage;
+        public boolean both;
+    }
+
     public static String createStudent(String firstName, String lastName, String dni, String email){
         try {
             Base.openTransaction();
@@ -98,5 +112,58 @@ public class StudentService {
             e.printStackTrace();
             return "Error al eliminar el estudiante [" + studentId + "]";
         }
+    }
+    
+    /**
+     *  ---------------- ACADEMIC PERFORMANCE QUERY  ------------------------------------------
+     */
+    public static PerformanceQueryResult performanceQuery(String planId, Object personId, String mode, String subjectsQuery){
+        Student student = Student.findFirst("person_id = ?", personId);       
+        String gradeMode = "";
+        boolean both = false;
+        if(mode.equals("aprobadas")){
+            gradeMode = " AND fg.grade >= 5";
+        } else if (mode.equals("desaprobadas")){
+            gradeMode = " AND fg.grade < 5";
+        } else {
+            both = true;
+        }
+
+        List<Map> subjects = Base.findAll(subjectsQuery + gradeMode, planId, student.getId(), student.getId());
+        List<Map> allSubjects = Base.findAll(subjectsQuery, planId, student.getId(), student.getId());
+        
+        float totalAverage = 0;
+        float approvedAverage = 0;
+        int approvedSubjects = 0;
+        for(Map m : allSubjects){
+            Object rawGrade = m.get("grade");
+            float grade = ((Number) rawGrade).floatValue();
+            if(grade >= 5){
+                approvedAverage += grade;
+                approvedSubjects++;
+            }
+            totalAverage += grade;
+        }
+
+        if(!allSubjects.isEmpty()){
+            totalAverage /= allSubjects.size();
+        } //Si no hay materias, el promedio no se muestra, por ende, no importa cómo haya quedado
+        if(approvedSubjects > 0){
+            approvedAverage /= approvedSubjects;
+        } else {
+            approvedAverage = 0;
+        }
+
+        PerformanceQueryResult p = new PerformanceQueryResult();
+        p.allSubjects = allSubjects;
+        p.subjects = subjects;
+        p.totalAverage = totalAverage;
+        p.approvedAverage = approvedAverage;
+        p.both = both;
+        return p;
+    }
+
+    public static Student findFirstStudent(String subquery, Object id){
+        return Student.findFirst(subquery, id);
     }
 }
