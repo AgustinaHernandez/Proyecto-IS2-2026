@@ -5,16 +5,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.mindrot.jbcrypt.BCrypt;
-
 import spark.Request;
 import spark.Response;
 
-import com.is1.proyecto.models.Person;
-import com.is1.proyecto.models.Student;
 import com.is1.proyecto.services.StudentService;
-import com.is1.proyecto.utils.EmailSender;
-import com.is1.proyecto.utils.PasswordGenerator;
+import com.is1.proyecto.utils.InputValidator;
 
 import spark.ModelAndView;
 
@@ -51,45 +46,29 @@ public class StudentController {
         String email = req.queryParams("email").trim();
         
         // Validaciones básicas: campos no pueden ser nulos o vacíos.
-        if (firstname == null || firstname.isEmpty()
-            || lastname == null || lastname.isEmpty() || email == null || email.isEmpty()
-            || dniStr == null || dniStr.isEmpty()
-        ) {
-            String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-            res.redirect("/student/create?error=" + errorMsg);
-            return "";
+        String emptyFieldsError = InputValidator.checkNoEmptyFields(new String[]{firstname, lastname, dniStr, email});
+        if(emptyFieldsError != null){
+            res.redirect("/student/create?error=" + emptyFieldsError);
         }
         //Validación de nombre
-        String result = firstname.replaceAll("\\d", ""); //Quitar todos los números del firstname
-        if(result.length() != firstname.length()){ //Chequear si cambió la longitud
-            String errorMsg = URLEncoder.encode("El nombre no puede contener números.", StandardCharsets.UTF_8);
-            res.redirect("/student/create?error=" + errorMsg);
-            return "";
+        String firstNameValidationError = InputValidator.validateName(firstname);
+        if(firstNameValidationError != null){
+            res.redirect("/student/create?error=" + firstNameValidationError);
         }
         //Validación de apellido
-        result = lastname.replaceAll("\\d", ""); //Quitar todos los números del lastname
-        if(result.length() != lastname.length()){ //Chequear si cambió la longitud
-            String errorMsg = URLEncoder.encode("El apellido no puede contener números.", StandardCharsets.UTF_8);
-            res.redirect("/student/create?error=" + errorMsg);
-            return "";
+        String lastNameValidationError = InputValidator.validateName(lastname);
+        if(lastNameValidationError != null){
+            res.redirect("/student/create?error=" + lastNameValidationError);
         }
         //Validación de mail
-        String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
-        if(!email.matches(emailRegex)) {
-            String errorMsg = URLEncoder.encode("Ingrese un correo electrónico válido (ej: usuario@dominio.com).", StandardCharsets.UTF_8);
-            res.redirect("/student/create?error=" + errorMsg);
-            return "";
+        String emailValidationError = InputValidator.validateEmail(email);
+        if(emailValidationError != null){
+            res.redirect("/recover-password?error=" + emailValidationError);
         }
         //Validación de DNI
-        Integer dni = 0;
-        try {
-            dni = Integer.parseInt(dniStr);
-            if (dni <= 0) throw new IllegalArgumentException("DNI inválido");
-        } catch (Exception e) {
-            res.status(400);
-            String errorMsg = URLEncoder.encode("El DNI debe ser un número válido.", StandardCharsets.UTF_8);
-            res.redirect("/student/create?error=" + errorMsg);
-            return "";
+        String dniValidationError = InputValidator.validateDNI(dniStr);
+        if(dniValidationError != null){
+            res.redirect("/recover-password?error=" + dniValidationError);
         }
 
         String errorMsg = StudentService.createStudent(firstname, lastname, dniStr, email);

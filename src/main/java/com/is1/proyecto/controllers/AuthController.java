@@ -11,6 +11,7 @@ import spark.Response;
 
 import com.is1.proyecto.services.AuthService;
 import com.is1.proyecto.services.AuthService.LoginServiceResult;
+import com.is1.proyecto.utils.InputValidator;
 
 /** Rutas --------------------------
  *  /login (GET/POST), 
@@ -167,18 +168,10 @@ public class AuthController {
     //POST recover-password
     public static Object handleRecoverPasswordRequest(Request req, Response res) {
         String email = req.queryParams("email");
-        //Validación básica, el campo mail no puede ser nulo o vacío.
-        if (email == null || email.isEmpty()) {
-            String errorMsg = URLEncoder.encode("Por favor, ingrese su correo electrónico.", StandardCharsets.UTF_8);
-            res.redirect("/recover-password?error=" + errorMsg);
-            return "";
-        }
-        //Validación de mail
-        String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
-        if(!email.matches(emailRegex)) {
-            String errorMsg = URLEncoder.encode("Ingrese un correo electrónico válido (ej: usuario@dominio.com).", StandardCharsets.UTF_8);
-            res.redirect("/recover-password?error=" + errorMsg);
-            return "";
+        
+        String emailValidationError = InputValidator.validateEmail(email);
+        if(emailValidationError != null){
+            res.redirect("/recover-password?error=" + emailValidationError);
         }
 
         System.out.println("Recuperando contraseña: " + email);            
