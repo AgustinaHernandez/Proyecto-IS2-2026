@@ -70,5 +70,5 @@ public class Teacher extends Model {
     public void setFileCode(Integer code){
         set("file_code", code);
     }
+    
 }
-
