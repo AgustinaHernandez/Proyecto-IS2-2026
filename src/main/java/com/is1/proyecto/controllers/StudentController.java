@@ -3,12 +3,19 @@ package com.is1.proyecto.controllers;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import spark.Request;
 import spark.Response;
 
+import com.is1.proyecto.models.Enrolled_Plan;
+import com.is1.proyecto.models.Plan;
+import com.is1.proyecto.models.Student;
+import com.is1.proyecto.models.User;
 import com.is1.proyecto.services.StudentService;
+import com.is1.proyecto.services.StudentService.PerformanceQueryResult;
+import com.is1.proyecto.services.UserService;
 import com.is1.proyecto.utils.InputValidator;
 
 import spark.ModelAndView;
@@ -119,4 +126,50 @@ public class StudentController {
         }
         return "";
     }
+
+    /**
+     *  ---------------- ACADEMIC PERFORMANCE QUERY ------------------------------------------
+     */
+
+    // GET
+    public static ModelAndView renderPerformanceForm(Request req, Response res){
+        Map<String, Object> model = new HashMap<>();
+        Object userId = req.session().attribute("userId");
+        User user = User.findById(userId);
+        Student student = Student.findFirst("person_id = ?", user.get("person_id"));
+
+        List<Enrolled_Plan> enrolled = Enrolled_Plan.where("student_id = ?", student.getId()).include(Plan.class);
+
+        model.put("enrolled", enrolled);
+        return new ModelAndView(model, "enrolled_careers.mustache");
+    }
+
+    //POST
+    public static ModelAndView handlePerformanceQuery(Request req, Response res){
+        Map<String, Object> model = new HashMap<>();
+        String planId = req.queryParams("plan_id");
+        Object userId = req.session().attribute("userId");
+        User user = UserService.find(userId);
+        Object personId = user.get("person_id");
+        String mode = req.queryParams("mode");
+
+        String subjectsQuery = "SELECT s.code, s.name, fs.year, fg.grade " + 
+                                "FROM (SELECT * FROM enrolled_plan WHERE plan_id = ? AND student_id = ?) AS ep " + //Subconsulta para plan seleccionado
+                                "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " + //Materias del plan
+                                "INNER JOIN enrolled_subject es ON es.student_id = ep.student_id AND sbp.subject_id = es.subject_id " + //Materias del alumno y del plan
+                                "INNER JOIN subjects s ON es.subject_id = s.id " + //Materias (para sacar los datos)
+                                "INNER JOIN final_sheets fs ON s.id = fs.subject_id " +  
+                                "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id " + 
+                                "WHERE fg.student_id = ?";
+
+        PerformanceQueryResult query = StudentService.performanceQuery(planId, personId, mode, subjectsQuery);
+        model.put("subjects", query.subjects);
+        model.put("hasSubjects", !query.allSubjects.isEmpty());
+        model.put("mode", mode);
+        model.put("both", query.both);
+        model.put("totalAverage", query.totalAverage);
+        model.put("approvedAverage", query.approvedAverage);
+        return new ModelAndView(model, "academic_performance.mustache");
+    }
+
 }

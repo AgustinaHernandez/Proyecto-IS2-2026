@@ -171,7 +171,10 @@ public class App {
         get("/student/delete", StudentController::renderDeleteForm, new MustacheTemplateEngine());
         //POST: Baja de estudiantes
         post("/student/delete", StudentController::handleStudentDelete);
-        
+
+        //GET: Consulta de rendimiento académico
+        get("/student/academic-performance", StudentController::renderPerformanceForm, new MustacheTemplateEngine());
+        post("/student/academic-performance", StudentController::handlePerformanceQuery, new MustacheTemplateEngine());
         
         //GET: Baja de Profesores
         get("/teacher/delete", TeacherController::renderDeleteForm, new MustacheTemplateEngine());
