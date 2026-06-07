@@ -9,20 +9,13 @@ import static spark.Spark.*; // Importa los métodos estáticos principales de S
 import org.javalite.activejdbc.Base; // Clase central de ActiveJDBC para gestionar la conexión a la base de datos.
 
 // Importaciones de Spark para renderizado de plantillas
-import spark.ModelAndView; // Representa un modelo de datos y el nombre de la vista a renderizar.
 import spark.template.mustache.MustacheTemplateEngine; // Motor de plantillas Mustache para Spark.
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-// Importaciones estándar de Java
-import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
-import java.util.List;
-import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
 
 // Importaciones de clases del proyecto
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 import com.is1.proyecto.controllers.*;
-import com.is1.proyecto.models.*;
+import com.is1.proyecto.utils.AccessControl;
 
 
 /**
@@ -52,16 +45,23 @@ public class App {
                 halt(500, "Error interno de base de datos.");
             }
         });
+
+
         // Filtro de seguridad que restringe el acceso solo al admin
         // Las rutas protegidas revisan el atributo isAdmin e isStudent de la sesion
-        before("/teacher/create", (req, res) -> checkAdminAccess(req, res));
-        before("/teacher/new", (req, res) -> checkAdminAccess(req, res));
-        before("/teacher/assign", (req, res) -> checkAdminAccess(req, res));
-        before("/subject/create", (req, res) -> checkAdminAccess(req, res));
-        before("/career/create", (req, res) -> checkAdminAccess(req, res));
-        before("/career/new", (req, res) -> checkAdminAccess(req, res));
-        before("/teacher/unassign", (req, res) -> checkAdminAccess(req, res));
-        before("/student/create", (req, res) -> checkAdminAccess(req, res));
+        before("/teacher/create", AccessControl::checkAdminAccess);
+        before("/teacher/new", AccessControl::checkAdminAccess);
+        before("/teacher/assign", AccessControl::checkAdminAccess);
+        before("/subject/create", AccessControl::checkAdminAccess);
+        before("/career/create", AccessControl::checkAdminAccess);
+        before("/career/new", AccessControl::checkAdminAccess);
+        before("/teacher/unassign", AccessControl::checkAdminAccess);
+        before("/student/create", AccessControl::checkAdminAccess);
+
+
+        // Filtro de seguridad que restringe el acceso solo a los estud
+        before("/student/subject-enroll", AccessControl::checkStudentAccess);
+
 
         // --- Filtro 'after-after' para cerrar la conexión a la base de datos pase lo que pase---
         afterAfter("/*", (req, res) -> {
@@ -184,227 +184,19 @@ public class App {
         post("/", AuthController::handleLogin, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta POST
 
         post("/set-role", ProfileController::handleSetRole);
-        
-        get("/enrollment", (req, res) -> {
-            Map<String, Object> model = new HashMap<>();
-            
-            Object userIdAttr = req.session().attribute("userId");
-            if (userIdAttr == null) {
-                req.session().attribute("error", "Acceso no autorizado.");
-                res.redirect("/"); 
-                return null;
-            }
-            
-            String activeRole = req.session().attribute("activeRole");
-            Boolean isStudent = req.session().attribute("isStudent");
-            
-            if (!"STUDENT".equals(activeRole) || !Boolean.TRUE.equals(isStudent)) {
-                req.session().attribute("error", "Acceso denegado: Solo los usuarios con el rol de Estudiante activo pueden inscribirse.");
-                res.redirect("/dashboard"); // Te redirige a tu pantalla de bienvenida
-                return null;
-            }
-            
-            User user = User.findById(userIdAttr);
-            if (user == null) {
-                res.redirect("/");
-                return null;
-            }
-            
-            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
-            if (student == null) {
-                req.session().attribute("error", "Error interno: No se encontró un perfil de estudiante para tu cuenta.");
-                res.redirect("/dashboard");
-                return null;
-            }
-
-            List<Subject> availableSubjects = student.getAvailableSubjectsToEnroll();
-            model.put("materias", availableSubjects);
-            model.put("hasMaterias", !availableSubjects.isEmpty());
-
-            model.put("username", req.session().attribute("currentUserUsername"));
-            model.put("activeRole", activeRole);
-            model.put("isActiveStudent", true);
-
-            if (req.session().attribute("error") != null) {
-                model.put("error", req.session().attribute("error"));
-                req.session().removeAttribute("error");
-            }
-            if (req.session().attribute("success") != null) {
-                model.put("success", req.session().attribute("success"));
-                req.session().removeAttribute("success");
-            }
-
-            return new ModelAndView(model, "enrollment.mustache");
-        }, new MustacheTemplateEngine());
 
         
-        get("/teacher/unassign", (req, res) -> {
-            Map<String, Object> model = new HashMap<>();
-            
-            // Control de Seguridad (Solo ADMIN)
-            Boolean isAdmin = req.session().attribute("isAdmin");
-            if (isAdmin == null || !isAdmin) {
-                res.redirect("/dashboard?error=Acceso restringido.");
-                return null;
-            }
+        // Inscripcion a materias
+        get("/student/subject-enroll", EnrollmentController::renderEnrollmentForm, new MustacheTemplateEngine());
+        post("/student/subject-enroll", EnrollmentController::handleEnrollment);
 
-            // Traemos las materias de la base de datos para rellenar el select del formulario
-            List<Subject> subjects = Subject.findAll();
-            model.put("subjects", subjects);
+        
+        get("/teacher/unassign", TeacherController::renderTeacherUnassign, new MustacheTemplateEngine());
+        post("/teacher/unassign", TeacherController::handleTeacherUnassignation);
 
-
-            if (req.session().attribute("errorMessage") != null) {
-                model.put("errorMessage", req.session().attribute("errorMessage"));
-                req.session().removeAttribute("errorMessage");
-            }
-            if (req.session().attribute("successMessage") != null) {
-                model.put("successMessage", req.session().attribute("successMessage"));
-                req.session().removeAttribute("successMessage");
-            }
-
-            return new ModelAndView(model, "teacher_unassign.mustache");
-        }, new MustacheTemplateEngine());
-
-        post("/enrollment", (req, res) -> {
-            Object userIdAttr = req.session().attribute("userId");
-            String activeRole = req.session().attribute("activeRole");
-
-            if (userIdAttr == null || !"STUDENT".equals(activeRole)) {
-                res.redirect("/");
-                return null;
-            }
-
-            String subjectIdParam = req.queryParams("subject_id");
-            if (subjectIdParam == null || subjectIdParam.isEmpty()) {
-                req.session().attribute("error", "Selección de materia inválida.");
-                res.redirect("/enrollment");
-                return null;
-            }
-
-            User user = User.findById(userIdAttr);
-            Student student = (user != null) ? Student.findFirst("person_id = ?", user.get("person_id")) : null;
-            Subject subject = Subject.findById(subjectIdParam);
-
-            if (student == null || subject == null) {
-                req.session().attribute("error", "Error de consistencia: Alumno o materia no encontrados.");
-                res.redirect("/enrollment");
-                return null;
-            }
-
-            List<String> errors = student.validateEnrollment(subject);
-            if (!errors.isEmpty()) {
-                req.session().attribute("error", "Inscripción rechazada: " + String.join(" ", errors));
-                res.redirect("/enrollment");
-                return null;
-            }
-
-            try {
-                Base.openTransaction();
-
-                // Buscamos el acta (grade_sheet) de cursado de la materia para el ciclo lectivo 2026
-                String gsSql = "SELECT id FROM grade_sheets WHERE subject_id = ? AND year = ? LIMIT 1";
-                Object gradeSheetId = Base.firstCell(gsSql, subject.getId(), 2026);
-
-                Base.exec("INSERT INTO statuses (grade_sheet_id, student_id, initial_condition, final_condition) VALUES (?, ?, ?, ?)", 
-                          gradeSheetId, student.getId(), "INSCRIPTO", "INSCRIPTO");
-
-                Base.commitTransaction();
-                req.session().attribute("success", "¡Te has inscripto con éxito a " + subject.getString("name") + "!");
-                
-            } catch (Exception e) {
-                Base.rollbackTransaction();
-                req.session().attribute("error", "Ocurrió un error inesperado en el servidor al procesar el alta.");
-                e.printStackTrace();
-            }
-
-            res.redirect("/enrollment");
-            return null;
-        });
-
-        post("/teacher/unassign", (req, res) -> {
-            
-            // Verificación de Seguridad (Solo ADMIN)
-            Boolean isAdmin = req.session().attribute("isAdmin");
-            if (isAdmin == null || !isAdmin) {
-                res.redirect("/dashboard");
-                return null;
-            }
-
-            String teacherIdStr = req.queryParams("teacher_id");
-            String subjectIdStr = req.queryParams("subject_id");
-
-            if (teacherIdStr == null || subjectIdStr == null || teacherIdStr.isEmpty() || subjectIdStr.isEmpty()) {
-                req.session().attribute("errorMessage", "Todos los campos son requeridos.");
-                res.redirect("/teacher/unassign");
-                return null;
-            }
-
-            try {
-                Integer teacherId = Integer.parseInt(teacherIdStr);
-                Integer subjectId = Integer.parseInt(subjectIdStr);
-
-                Subject subject = Subject.findById(subjectId);
-                if (subject == null) {
-                    req.session().attribute("errorMessage", "La materia seleccionada no existe.");
-                    res.redirect("/teacher/unassign");
-                    return null;
-                }
-
-                // Evitar desasignar al profesor responsable de la materia
-                if (subject.getInteger("responsible_id").equals(teacherId)) {
-                    req.session().attribute("errorMessage", "No puedes desasignar a este profesor porque figura como el Responsable obligatorio de la materia. Asigna a otro responsable antes de removerlo.");
-                    res.redirect("/teacher/unassign");
-                    return null;
-                }
-
-                // PROCESO DE DESASIGNACIÓN
-                Base.openTransaction();
-                
-                int rowsDeleted = Base.exec("DELETE FROM teaches WHERE teacher_id = ? AND subject_id = ?", teacherId, subjectId);
-                
-                if (rowsDeleted > 0) {
-                    Base.commitTransaction();
-                    req.session().attribute("successMessage", "El profesor ha sido desasignado exitosamente de la asignatura.");
-                } else {
-                    Base.rollbackTransaction();
-                    req.session().attribute("errorMessage", "El profesor ingresado no pertenece al equipo docente asignado a esta materia.");
-                }
-
-            } catch (Exception e) {
-                Base.rollbackTransaction();
-                e.printStackTrace();
-                req.session().attribute("errorMessage", "Ocurrió un error inesperado al procesar la desasignación.");
-            }
-
-            res.redirect("/teacher/unassign");
-            return null;
-        });
 
 
 
     } // Fin del método main
-
-    /**
-     * Filtro de verificación de acceso administrativo.
-     * Solo permite el acceso si el usuario tiene el flag 'isAdmin' en true en la sesión.
-     */
-    private static void checkAdminAccess(spark.Request req, spark.Response res) {
-        Boolean isAdmin = (Boolean) req.session().attribute("isAdmin");
-        Boolean loggedIn = (Boolean) req.session().attribute("loggedIn");
-        String currentUsername = req.session().attribute("currentUserUsername");
-        String activeRole = (String) req.session().attribute("activeRole");
-
-        if (currentUsername == null || loggedIn == null || !loggedIn) {
-            res.redirect("/?error=" + URLEncoder.encode("Acceso no autorizado.", StandardCharsets.UTF_8));
-            halt(); 
-            return;
-        }
-
-        if (isAdmin == null || !isAdmin || activeRole != "ADMIN") {
-            System.out.println("DEBUG: Acceso a ruta de administrador denegado al usuario: " + currentUsername);
-            res.redirect("/dashboard?error=" + URLEncoder.encode("Acceso denegado. Se requieren permisos de administrador.", StandardCharsets.UTF_8));
-            halt(); 
-        }
-    }
 
 } // Fin de la clase App

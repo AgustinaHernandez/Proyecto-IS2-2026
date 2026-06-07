@@ -1,8 +1,5 @@
 package com.is1.proyecto.services;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-
 import org.javalite.activejdbc.Base;
 import org.mindrot.jbcrypt.BCrypt;
 

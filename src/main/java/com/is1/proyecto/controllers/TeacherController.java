@@ -11,6 +11,7 @@ import com.is1.proyecto.models.Person;
 import com.is1.proyecto.models.Subject;
 import com.is1.proyecto.models.Teacher;
 import com.is1.proyecto.services.TeacherService;
+import com.is1.proyecto.utils.InputValidator;
 
 import spark.ModelAndView;
 import spark.Request;
@@ -133,6 +134,48 @@ public class TeacherController {
             res.redirect("/teacher/assign?success=" + URLEncoder.encode("Docente dado de alta exitosamente.", StandardCharsets.UTF_8));
         }
         return "";
+    }
+
+
+    public static ModelAndView renderTeacherUnassign(Request req, Response res){
+        Map<String, Object> model = new HashMap<>();
+
+        model.put("subjects", TeacherService.getAllSubjects());
+        
+        if (req.session().attribute("errorMessage") != null) {
+            model.put("errorMessage", req.session().attribute("errorMessage"));
+            req.session().removeAttribute("errorMessage");
+        }
+        if (req.session().attribute("successMessage") != null) {
+            model.put("successMessage", req.session().attribute("successMessage"));
+            req.session().removeAttribute("successMessage");
+        }
+        return new ModelAndView(model, "teacher_unassign.mustache");
+    }
+
+
+
+    public static Object handleTeacherUnassignation(Request req, Response res){
+        String id = req.queryParams("teacher_id");
+        String subjectId = req.queryParams("subject_id");
+
+        // Validaciones básicas: campos no pueden ser nulos o vacíos.
+        String emptyFieldsError = InputValidator.checkNoEmptyFields(new String[]{id, subjectId});
+        if(emptyFieldsError != null){
+            //req.session().attribute("errorMessage", "Todos los campos son requeridos.");
+            res.redirect("/teacher/unassign?error=" + emptyFieldsError);
+            return "";
+        }
+
+        String errorMsg = TeacherService.unassignTeacher(id, subjectId);
+        
+        if (errorMsg != null) {
+            res.redirect("/teacher/unassign?error=" + URLEncoder.encode(errorMsg, StandardCharsets.UTF_8));
+        } else {
+            res.redirect("/teacher/unassign?success=" + URLEncoder.encode("El profesor ha sido desasignado exitosamente de la asignatura.", StandardCharsets.UTF_8));
+        }
+        return "";
+
     }
 
     //GET teacher/delete

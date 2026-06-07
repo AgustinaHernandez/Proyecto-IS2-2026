@@ -146,6 +146,49 @@ public class TeacherService {
     }
 
 
+    public static List<Subject> getAllSubjects(){
+        return Subject.findAll();
+    }
+
+
+    public static String unassignTeacher(String teacherIdStr, String subjectIdStr){
+        try {
+            Integer teacherId = Integer.parseInt(teacherIdStr);
+            Integer subjectId = Integer.parseInt(subjectIdStr);
+
+            Subject subject = Subject.findById(subjectId);
+            if (subject == null) {
+                return "La materia seleccionada no existe.";
+            }
+
+            // Evitar desasignar al profesor responsable de la materia
+            if (subject.getInteger("responsible_id").equals(teacherId)) {
+                return "No puedes desasignar a este profesor porque figura como el Responsable obligatorio de la materia. Asigna a otro responsable antes de removerlo.";
+            }
+
+            // PROCESO DE DESASIGNACIÓN
+            Base.openTransaction();
+            
+            int rowsDeleted = Base.exec("DELETE FROM teaches WHERE teacher_id = ? AND subject_id = ?", teacherId, subjectId);
+            
+            if (rowsDeleted > 0) {
+                Base.commitTransaction();
+                return null;
+            } else {
+                Base.rollbackTransaction();
+                return "El profesor ingresado no pertenece al equipo docente asignado a esta materia.";
+            }
+
+        } catch (Exception e) {
+            Base.rollbackTransaction();
+            e.printStackTrace();
+            return "Ocurrió un error inesperado al procesar la desasignación.";
+        }
+    }
+
+    
+
+
 
     // GET: lista de profesores (filtrada o todos)
     public static List<Teacher> getTeachersForDeletion(String query, int offset) {

@@ -95,7 +95,7 @@ public class AuthController {
 
     // GET: /logout
     // (mantengo los comentarios originales del App.java)
-    public static Object handleLogout(spark.Request req, spark.Response res) {
+    public static Object handleLogout(Request req, Response res) {
         // Invalida completamente la sesión del usuario.
         // Esto elimina todos los atributos guardados en la sesión y la marca como inválida.
         // La cookie JSESSIONID en el navegador también será gestionada para invalidarse.

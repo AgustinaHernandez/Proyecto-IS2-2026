@@ -1,7 +1,5 @@
 package com.is1.proyecto.utils;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 public class InputValidator {
     public static String checkNoEmptyFields(String... fields){
