@@ -1,0 +1,85 @@
+{{> header}}
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen p-8 transition-colors duration-300 flex flex-col justify-center items-center">
+    
+    <div class="w-full max-w-xl mx-auto">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Calificar Exámenes Finales</h1>
+            <p class="mt-2 text-gray-600 dark:text-gray-400">Seleccioná la mesa correspondiente a tu materia para ingresar las notas.</p>
+        </div>
+
+        {{#errorMessage}}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6 shadow-sm flex items-center gap-3">
+            <span class="block sm:inline font-medium">{{errorMessage}}</span>
+        </div>
+        {{/errorMessage}}
+
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            
+            {{#hasFinalSheets}}
+            <form action="/teacher/grade-final" method="GET" class="space-y-6">
+                <div>
+                    <label for="final_sheet_id" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Mis Mesas de Examen
+                    </label>
+                    <div class="relative">
+                        <select id="final_sheet_id" name="final_sheet_id" required
+                            class="w-full appearance-none px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white transition-colors cursor-pointer text-base">
+                            <option value="" disabled selected>-- Elegí una mesa --</option>
+                            
+                            {{#finalSheets}}
+                            <option value="{{final_sheet_id}}">
+                                {{subject_name}} | Fecha: {{year}} | Llamado: {{call}}
+                            </option>
+                            {{/finalSheets}}
+                            
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500 dark:text-gray-400">
+                            <svg class="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4">
+                    <button type="submit" 
+                        class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-500/50 transition-all shadow-md flex justify-center items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        Abrir Planilla de Notas
+                    </button>
+                </div>
+            </form>
+            {{/hasFinalSheets}}
+
+            {{^hasFinalSheets}}
+            <div class="text-center py-6">
+                <div class="bg-gray-100 dark:bg-gray-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="h-8 w-8 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Sin mesas habilitadas</h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    Actualmente no tenés mesas de final abiertas para las materias que dictás.
+                </p>
+            </div>
+            {{/hasFinalSheets}}
+
+        </div>
+
+        <div class="mt-8 text-center">
+            <a href="/dashboard" class="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-medium hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Volver al Dashboard
+            </a>
+        </div>
+        
+    </div>
+
+</body>
+</html>

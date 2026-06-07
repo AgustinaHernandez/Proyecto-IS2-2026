@@ -259,6 +259,40 @@
                 </div>
             </div>
             {{/isActiveStudent}}
+
+            <!-- Finales -->
+            <div class="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-violet-50 dark:bg-violet-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                <div class="relative z-10">
+                    <div class="w-12 h-12 bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400 rounded-xl flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                            <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-2">Exámenes Finales</h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-5 leading-relaxed">Gestión de mesas de exámenes, inscripciones y carga de notas definitivas.</p>
+                    
+                    {{#isActiveAdmin}}
+                    <a href="/final/new" class="inline-flex items-center text-sm font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-800 transition-colors mb-2">
+                        Alta mesa de examen <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </a><br>
+                    {{/isActiveAdmin}}
+
+                    {{#isActiveStudent}}
+                    <a href="/student/enroll-final" class="inline-flex items-center text-sm font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-800 transition-colors mb-2">
+                        Inscripción a finales <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </a><br>
+                    {{/isActiveStudent}}
+
+                    {{#isActiveTeacher}}
+                    <a href="/teacher/select-final" class="inline-flex items-center text-sm font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-800 transition-colors">
+                        Cargar notas de finales <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </a>
+                    {{/isActiveTeacher}}
+                </div>
+            </div>
             
         </div>
 
