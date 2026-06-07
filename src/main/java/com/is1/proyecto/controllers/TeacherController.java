@@ -2,7 +2,6 @@ package com.is1.proyecto.controllers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -95,16 +94,9 @@ public class TeacherController {
         List<Map<String, Object>> subjects = Subject.findAll().toMaps();
         // obtener el parámetro de búsqueda que el admin puso en el campo
         String searchQuery = req.queryParams("q");
-        List<Teacher> teachers;
-        if (searchQuery != null && !searchQuery.trim().isEmpty()) {
-            String likeQuery = "%" + searchQuery.trim() + "%";
-            teachers = Teacher.findBySQL(
-                "SELECT t.* FROM teachers t JOIN persons p ON t.person_id = p.id WHERE p.first_name LIKE ? OR p.last_name LIKE ?", 
-                likeQuery, likeQuery
-            ).include(Person.class);
-        } else {
-            teachers = java.util.Collections.emptyList();
-        }
+
+        List<Teacher> teachers = TeacherService.findTeacher(searchQuery);
+        
         Map<String, Object> model = Map.of(
             "tituloPagina", "Asignar Profesor a Materia",
             "teachers", teachers,

@@ -120,6 +120,22 @@ public class TeacherService {
         }
     }
 
+    public static List<Teacher> findTeacher(String searchQuery){
+        List<Teacher> teachers;
+
+        if (searchQuery != null && !searchQuery.trim().isEmpty()) {
+            String likeQuery = "%" + searchQuery.trim() + "%";
+            teachers = Teacher.findBySQL(
+                "SELECT t.* FROM teachers t JOIN persons p ON t.person_id = p.id WHERE p.first_name LIKE ? OR p.last_name LIKE ?", 
+                likeQuery, likeQuery
+            ).include(Person.class);
+        }else{
+            teachers = java.util.Collections.emptyList();
+        }
+
+        return teachers;
+    }
+
     public static List<Map<String, Object>> searchTeachers(String query) {
         //Retornar lista vacia si no hay parámetro de búsqueda
         if (query == null || query.trim().isEmpty()) {
