@@ -10,6 +10,7 @@ import spark.Request;
 import spark.Response;
 
 import com.is1.proyecto.services.AuthService;
+import com.is1.proyecto.services.AuthService.LoginServiceResult;
 
 /** Rutas --------------------------
  *  /login (GET/POST), 
@@ -20,6 +21,94 @@ import com.is1.proyecto.services.AuthService;
  */
 
 public class AuthController {
+
+    // GET: login (/)
+    public static ModelAndView renderLoginForm(Request req, Response res) {
+        Map<String, Object> model = Map.of(
+            "errorMessage", req.queryParamOrDefault("error", ""),
+            "successMessage", req.queryParamOrDefault("message", "")
+        );
+        return new ModelAndView(model, "login.mustache");
+    }
+
+    // POST: /login
+    public static ModelAndView handleLogin(Request req, Response res) {
+        String username = req.queryParams("username");
+        String plainTextPassword = req.queryParams("password");
+
+        LoginServiceResult serviceResult = AuthService.authenticate(username, plainTextPassword);
+
+        if (!serviceResult.success) {
+            res.status(serviceResult.status);
+            if (serviceResult.status != 400 && serviceResult.ac != null) {
+                // Contraseña incorrecta.
+                System.out.println("DEBUG: Intento de login fallido para: " + username);
+            }
+            return new ModelAndView(Map.of(
+                "tituloPagina", "Iniciar Sesión",
+                "errorMessage", serviceResult.errorMessage
+            ), "login.mustache"); // Renderiza la plantilla de login con error.
+        }
+
+        res.status(serviceResult.status);
+
+        // --- Gestión de Sesión ---
+        req.session(true).attribute("currentUserUsername", username); // Guarda el nombre de usuario en la sesión.
+        req.session().attribute("userId", serviceResult.ac.getId()); // Guarda el ID de la cuenta en la sesión (útil).
+        req.session().attribute("loggedIn", true); // Establece una bandera para indicar que el usuario está logueado.
+        // Roles
+        req.session().attribute("isAdmin", serviceResult.isAdmin); 
+        req.session().attribute("isTeacher", serviceResult.isTeacher);
+        req.session().attribute("isStudent", serviceResult.isStudent);
+        req.session().attribute("isRegularStudent", serviceResult.isRegularStudent);
+        // Asignar rol activo
+        if(serviceResult.isAdmin) req.session().attribute("activeRole","ADMIN");
+        else if(serviceResult.isTeacher) req.session().attribute("activeRole","TEACHER");
+        else if(serviceResult.isStudent) req.session().attribute("activeRole","STUDENT");
+        else req.session().attribute("activeRole","NONE");
+
+        String activeRole = (String) req.session().attribute("activeRole");
+
+        System.out.println("DEBUG Login exitoso para " + username + " (Admin: " + serviceResult.isAdmin + ")");
+        
+        System.out.println("DEBUG: Login exitoso para la cuenta: " + username);
+        System.out.println("DEBUG: ID de Sesión: " + req.session().id());
+
+        // Renderiza la plantilla del dashboard tras un login exitoso.
+        ModelAndView model = new ModelAndView(Map.of(
+            "username", username,
+            "isAdmin", serviceResult.isAdmin,
+            "isTeacher", serviceResult.isTeacher,
+            "isStudent", serviceResult.isStudent,
+            "hasMultipleRoles", serviceResult.roleCount > 1,
+            "activeRole", activeRole,
+            "isActiveAdmin", "ADMIN".equals(activeRole),
+            "isActiveTeacher", "TEACHER".equals(activeRole),
+            "isActiveStudent", "STUDENT".equals(activeRole),
+            "tituloPagina", "Dashboard - Bienvenido"
+        ), "dashboard.mustache");
+
+        return model;
+    }
+
+
+    // GET: /logout
+    // (mantengo los comentarios originales del App.java)
+    public static Object handleLogout(spark.Request req, spark.Response res) {
+        // Invalida completamente la sesión del usuario.
+        // Esto elimina todos los atributos guardados en la sesión y la marca como inválida.
+        // La cookie JSESSIONID en el navegador también será gestionada para invalidarse.
+        req.session().invalidate();
+
+        System.out.println("DEBUG: Sesión cerrada. Redirigiendo a /.");
+
+        // Redirige al usuario a la página de login con un mensaje de éxito.
+        res.redirect("/");
+
+        return null; // Importante retornar null después de una redirección.
+    }
+
+
     // GET change-password
     public static ModelAndView renderChangePassword(Request req, Response res) {
         String currentUsername = req.session().attribute("currentUserUsername");

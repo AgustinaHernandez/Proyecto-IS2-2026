@@ -144,4 +144,47 @@ public class TeacherService {
         
         return resultList;
     }
+
+
+
+    // GET: lista de profesores (filtrada o todos)
+    public static List<Teacher> getTeachersForDeletion(String query, int offset) {
+        if (query != null && !query.trim().isEmpty()) {
+            return Teacher.findBySQL(
+                "SELECT t.* FROM teachers t " +
+                "JOIN persons p ON t.person_id = p.id " +
+                "WHERE p.first_name LIKE ? OR p.last_name LIKE ? OR CAST(p.dni AS TEXT) LIKE ?",
+                "%" + query.trim() + "%", 
+                "%" + query.trim() + "%", 
+                "%" + query.trim() + "% LIMIT " + offset
+            ).include(Person.class);
+        } else {
+            return Teacher.findAll().include(Person.class);
+        }
+    }
+
+    // POST
+    public static String deleteTeacher(String teacherId) {
+        if (teacherId == null || teacherId.isEmpty())
+            return "ID de docente no proporcionado.";
+        
+        try {
+            Base.openTransaction();
+            Teacher t = Teacher.findById(Integer.parseInt(teacherId));
+            
+            if (t != null) {
+                t.delete();
+                Base.commitTransaction();
+                return null;
+            } else {
+                Base.rollbackTransaction();
+                return "El docente no existe.";
+            }
+        } catch (Exception e) {
+            Base.rollbackTransaction();
+            e.printStackTrace();
+            return "Error interno al eliminar el docente.";
+        }
+    }
+
 }

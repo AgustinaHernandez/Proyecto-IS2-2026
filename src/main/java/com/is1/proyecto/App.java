@@ -25,7 +25,6 @@ import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 import com.is1.proyecto.controllers.*;
 import com.is1.proyecto.models.*;
-import com.is1.proyecto.models.controllers.TeacherControllerOld;
 import com.is1.proyecto.utils.EmailSender;
 import com.is1.proyecto.utils.PasswordGenerator;
 
@@ -90,10 +89,6 @@ public class App {
                 System.err.println("Error al cerrar conexión con ActiveJDBC: " + e.getMessage());
             }
         });
-
-        MustacheTemplateEngine engine = new MustacheTemplateEngine();
-
-        TeacherControllerOld.registrarRutas(engine, objectMapper);
         
 
         // --- Rutas GET para renderizar formularios y páginas HTML ---
@@ -152,61 +147,28 @@ public class App {
         //POST: Alta de teacher
         post("/teacher/assign", TeacherController::handleTeacherAssignation);
         
-        /*
-        //GET: Muestra el formulario de recuperación de contraseña.
-        get("/recover-password", (req, res) -> {
-
-            Map<String, Object> model = Map.of(
-                "tituloPagina", "Recuperar contraseña",
-                "errorMessage", req.queryParamOrDefault("error", ""),
-                "successMessage", req.queryParamOrDefault("message", "")
-            );
-
-            return new ModelAndView(model, "recover_password.mustache");
-        }, new MustacheTemplateEngine());
-
-        //GET: Muestra el formulario de ingreso de código y consecuente reseteo de contraseña.
-        get("/reset-password", (req, res) -> {
-
-            Map<String, Object> model = Map.of(
-                "tituloPagina", "Ingresar código",
-                "errorMessage", req.queryParamOrDefault("error", ""),
-                "successMessage", req.queryParamOrDefault("message", "")
-            );
-
-            return new ModelAndView(model, "reset_password.mustache");
-        }, new MustacheTemplateEngine());
-        */
-
-        /*¨
         
-        //GET: Muestra el formulario de cambio de contraseña "voluntario" (estando logeado)
-        get("/change-password", (req, res) -> {
-            String currentUsername = req.session().attribute("currentUserUsername");
-            Boolean loggedIn = req.session().attribute("loggedIn");
-            
-            if (currentUsername == null || loggedIn == null || !loggedIn) {
-                System.out.println("DEBUG: Acceso no autorizado a /change-password. Redirigiendo a /login.");
-                res.redirect("/?error=Acceso+no+autorizado.");
-                return null;
-            }
+        //GET: Baja de Profesores
+        get("/teacher/delete", TeacherController::renderDeleteForm, new MustacheTemplateEngine());
+        //POST: Baja de Profesores
+        post("/teacher/delete", TeacherController::handleDeleteTeacher);
 
-            Map<String, Object> model = new HashMap<>();
-            model.put("tituloPagina", "Cambiar contraseña");
 
-            String error = req.queryParams("error");
-            if (error != null && !error.isEmpty()) {
-                model.put("errorMessage", error);
-            }
 
-            String success = req.queryParams("success");
-            if (success != null && !success.isEmpty()) {
-                model.put("successMessage", success);
-            }
+        // GET: Muestra el formulario de inicio de sesión (login).
+        get("/", AuthController::renderLoginForm, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
 
-            return new ModelAndView(model, "change_password.mustache");
-        }, new MustacheTemplateEngine());
-        */
+        //GET: /logout
+        get("/logout", AuthController::handleLogout);
+
+        // POST: Maneja el envío del formulario de inicio de sesión.
+        post("/login", AuthController::handleLogin, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta POST
+
+
+        
+        post("/set-role", ProfileController::handleSetRole);
+
+
 
         // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
         // Requiere que el usuario esté autenticado.
@@ -276,6 +238,7 @@ public class App {
             return new ModelAndView(model, "settings.mustache");
         }, new MustacheTemplateEngine());
 
+/*
         // GET: Ruta para cerrar la sesión del usuario.
         get("/logout", (req, res) -> {
             // Invalida completamente la sesión del usuario.
@@ -290,7 +253,8 @@ public class App {
 
             return null; // Importante retornar null después de una redirección.
         });
-
+ */
+/*
         // GET: Muestra el formulario de inicio de sesión (login).
         // Nota: Esta ruta debería ser capaz de leer también mensajes de error/éxito de los query params
         // si se la usa como destino de redirecciones. 
@@ -306,7 +270,7 @@ public class App {
             }
             return new ModelAndView(model, "login.mustache");
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
-
+ */
 
 
         get("/profile", (req, res) -> {
@@ -534,7 +498,7 @@ public class App {
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
 
-
+/*
         // POST: Maneja el envío del formulario de inicio de sesión.
         post("/login", (req, res) -> {
             Map<String, Object> model = new HashMap<>(); // Modelo para la plantilla de login o dashboard.
@@ -630,8 +594,7 @@ public class App {
                 return new ModelAndView(model, "login.mustache"); // Renderiza la plantilla de login con error.
             }
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta POST.
-
-
+*/
         post("/subject/new", (req, res) -> {
             String id = req.queryParams("code"); 
             String name = req.queryParams("name");
@@ -668,71 +631,6 @@ public class App {
             }
             return "";
         });
-
-        
-/*
-        post("/plan/new", (req, res) -> {
-                     
-            String careerId = req.queryParams("career_id"); // id de la carrera seleccionada
-            String statePlan = req.queryParams("state");   //estado del plan
-            String versionPlan = req.queryParams("version"); // version del plan
-           
-            // Validaciones básicas: campos no pueden ser nulos o vacíos.
-
-             if (careerId == null || careerId.isEmpty()){
-               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-               res.redirect("/career/create?error=" + errorMsg);
-               return "";
-            }
-
-             if (statePlan == null || statePlan.isEmpty()){
-               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-               res.redirect("/career/create?error=" + errorMsg);
-               return "";
-
-            }
-
-            if (versionPlan == null || versionPlan.isEmpty()){
-               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-               res.redirect("/career/create?error=" + errorMsg);
-               return "";  
-
-            }
-
-            //Principal
-            try {
-                // Intenta crear y guardar el nuevo plan de estudios  en la base de datos.
-                
-                Base.openTransaction();  // Iniciamos la transaccion
-
-                Plan np = new Plan(); // Crea una nueva instancia del modelo PLan.
-                
-                np.set("career_id",careerId);
-                np.set("state",statePlan);
-                np.set("version",versionPlan);
-                np.saveIt();
-
-                Base.commitTransaction();               
-
-                res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
-                // Redirige al formulario de creación con un mensaje de éxito.
-                String successMsg = URLEncoder.encode("Plan "+versionPlan+" registrado correctamente.",StandardCharsets.UTF_8);
-                res.redirect("/plan/new?successMessage="+successMsg);
-                return ""; // Retorna una cadena vacía.
-
-
-           } catch (Exception e) {
-               // Si ocurre cualquier error durante la operación de DB (ej. código de carrera duplicado),
-               // se captura aquí y se redirige con un mensaje de error.
-               Base.rollbackTransaction(); // Si falla algo deshace
-               e.printStackTrace(); // Imprime el stack trace para depuración.
-               res.status(500); // Código de estado HTTP 500 (Internal Server Error).
-               String errorMsg = URLEncoder.encode("ERROR: id de plan de carrera ya existente o error interno.", StandardCharsets.UTF_8);
-               res.redirect("/plan/new?errorMessage="+errorMsg);
-               return ""; // Retorna una cadena vacía.
-           }
-        });
- */
 
         post("/student/remove", (req, res) -> {
             String id = req.queryParams("id");
@@ -877,7 +775,7 @@ public class App {
                 return ""; 
            }
         });
-
+/*
         post("/set-role", (req, res) -> {
             String selectedRole = req.queryParams("role");
             System.out.println(selectedRole);            
@@ -887,204 +785,7 @@ public class App {
             res.redirect("/dashboard");
             return "";
         });
-        /*
-        post("/recover-password", (req, res) -> {
-            String email = req.queryParams("email");
-
-            //Validación básica, el campo mail no puede ser nulo o vacío.
-            if (email == null || email.isEmpty()) {
-               String errorMsg = URLEncoder.encode("Por favor, ingrese su correo electrónico.", StandardCharsets.UTF_8);
-               res.redirect("/recover-password?error=" + errorMsg);
-               return "";
-            }
-            //Validación de mail
-            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
-            if(!email.matches(emailRegex)) {
-                String errorMsg = URLEncoder.encode("Ingrese un correo electrónico válido (ej: usuario@dominio.com).", StandardCharsets.UTF_8);
-                res.redirect("/recover-password?error=" + errorMsg);
-                return "";
-            }
-
-            System.out.println("Recuperando contraseña: " + email);            
-            
-            //Buscar a la persona por email en la tabla persons
-            Person person = Person.findFirst("email = ?", email);
-            //Si la persona no existe, lo ignoramos
-            if (person != null) {
-                //Buscar al usuario vinculado a esa persona
-                User user = User.findFirst("person_id = ?", person.getId());
-                if (user != null) {
-                    //Generar código random
-                    String rawCode = String.format("%06d", new java.util.Random().nextInt(999999));
-                    //Guardar código en la DB
-                    RecoverPasswordCode recovery = new RecoverPasswordCode();
-                    recovery.set("user_id", user.getId());
-                    recovery.set("code", rawCode);
-                    recovery.saveIt();
-                    //Enviar el mail de forma asíncrona
-                    try {
-                        EmailSender.sendRecoveryMail(email,rawCode);
-                        System.out.println("Correo enviado a: " + email + " con código: " + rawCode);
-                    } catch (Exception e) {
-                        System.err.println("Error al enviar el correo:");
-                        e.printStackTrace();
-                    }
-                }
-            }
-            //Se redirecciona siempre, incluso si no existía el mail, por cuestiones de seguridad
-            res.redirect("/reset-password");
-            return "";
-        });
-        */
-        /*
-        post("/reset-password", (req, res) -> {
-            String token = req.queryParams("token");
-            String newPassword = req.queryParams("newPassword");
-            String confirmPassword = req.queryParams("confirmPassword");
-
-            //Validación de campos obligatorios
-            if (token == null || token.isEmpty() || newPassword == null || newPassword.isEmpty() || confirmPassword == null || confirmPassword.isEmpty()) {
-                String errorMsg = URLEncoder.encode("Todos los campos son obligatorios.", StandardCharsets.UTF_8);
-                res.redirect("/reset-password?error=" + errorMsg);
-                return "";
-            }
-
-            //Validación de coincidencia de contraseñas
-            if (!newPassword.equals(confirmPassword)) {
-                String errorMsg = URLEncoder.encode("Las contraseñas no coinciden.", StandardCharsets.UTF_8);
-                res.redirect("/reset-password?error=" + errorMsg);
-                return "";
-            }
-
-            //Buscar el código en la DB
-            RecoverPasswordCode recoveryRecord = RecoverPasswordCode.findFirst("code = ?", token);
-
-            if (recoveryRecord == null) {
-                String errorMsg = URLEncoder.encode("El código de verificación ingresado es incorrecto.", StandardCharsets.UTF_8);
-                res.redirect("/reset-password?error=" + errorMsg);
-                return "";
-            }
-
-            //Verificación de expiración del código (el límite es de 15 minutos)
-            java.sql.Timestamp creationTime = recoveryRecord.getTimestamp("creation_time");
-            long diferenciaMilisegundos = System.currentTimeMillis() - creationTime.getTime();
-            long quinceMinutosEnMilisegundos = 15 * 60 * 1000;
-
-            if (diferenciaMilisegundos > quinceMinutosEnMilisegundos) {
-                recoveryRecord.delete(); // Eliminar el código expirado
-                String errorMsg = URLEncoder.encode("El código expiró. Por favor, solicitá uno nuevo.", StandardCharsets.UTF_8);
-                res.redirect("/recover-password?error=" + errorMsg);
-                return "";
-            }
-
-            //Buscar el usuario asociado al código de recuperación
-            Object userId = recoveryRecord.get("user_id");
-            User user = User.findById(userId);
-
-            if (user == null) {
-                String errorMsg = URLEncoder.encode("No se pudo encontrar el usuario asociado.", StandardCharsets.UTF_8);
-                res.redirect("/reset-password?error=" + errorMsg);
-                return "";
-            }
-
-            //Actualización de contraseña e invalidación del token (en una transacción)
-            try {
-                String hashedPassword = org.mindrot.jbcrypt.BCrypt.hashpw(newPassword, org.mindrot.jbcrypt.BCrypt.gensalt());
-                user.set("password", hashedPassword);
-                user.saveIt();
-
-                recoveryRecord.delete();
-                
-                //Enviar mail de advertencia de contraseña cambiada
-                Object personId = user.get("person_id");
-                Person person = Person.findById(personId);
-                String email = person.getMail();
-                if (email != null && !email.isEmpty()) {
-                    EmailSender.sendPasswordChangedWarning(email);
-                }
-
-                System.out.println("Contraseña restablecida para el usuario ID: " + userId);
-                
-                String successMsg = URLEncoder.encode("Contraseña restablecida con éxito. Ya podés iniciar sesión.", StandardCharsets.UTF_8);
-                res.redirect("/?message=" + successMsg);
-
-                return "";
-
-            } catch (Exception e) {
-                System.err.println("Error al actualizar la contraseña en la base de datos:");
-                e.printStackTrace();
-                String errorMsg = URLEncoder.encode("Ocurrió un error interno al procesar el cambio.", StandardCharsets.UTF_8);
-                res.redirect("/reset-password?error=" + errorMsg);
-                return "";
-            }
-        });
-        */
-        /*
-        post("/change-password", (req, res) -> {
-            String currentPassword = req.queryParams("currentPassword");
-            String newPassword = req.queryParams("newPassword");
-            String confirmPassword = req.queryParams("confirmPassword");
-
-            //Validar que las contraseñas nuevas coincidan
-            if (newPassword == null || !newPassword.equals(confirmPassword)) {
-                String errorMsg = URLEncoder.encode("Las contraseñas nuevas no coinciden.", StandardCharsets.UTF_8);
-                res.redirect("/change-password?error=" + errorMsg);
-                return "";
-            }
-
-            try {
-                //Obtener user de la sesión
-                Integer userId = req.session().attribute("userId");
-                if (userId == null) {
-                    String errorMsg = URLEncoder.encode("La sesión expiró. Volvé a logearte.", StandardCharsets.UTF_8);
-                    res.redirect("/?error=" + errorMsg);
-                    return "";
-                }
-
-                User user = User.findById(userId);
-                if (user == null) {
-                    res.redirect("/");
-                    return "";
-                }
-
-                //Comparar el hash de la contraseña que puso el usuario con la que está en la DB
-                String currentHash = user.getString("password");
-                if (!org.mindrot.jbcrypt.BCrypt.checkpw(currentPassword, currentHash)) {
-                    String errorMsg = URLEncoder.encode("La contraseña actual es incorrecta.", StandardCharsets.UTF_8);
-                    res.redirect("/change-password?error=" + errorMsg);
-                    return "";
-                }
-
-                //Hashear la nueva contraseña y guardarla
-                String newHash = org.mindrot.jbcrypt.BCrypt.hashpw(newPassword, org.mindrot.jbcrypt.BCrypt.gensalt());
-                user.set("password", newHash);
-                user.saveIt();
-
-                //Enviar el mail de advertencia de cambio de contraseña
-                Object personId = user.get("person_id");
-                Person person = Person.findById(personId);
-                
-                if (person != null) {
-                    String email = person.getString("email");
-                    if (email != null && !email.isEmpty()) {
-                        EmailSender.sendPasswordChangedWarning(email);
-                    }
-                }
-
-                String successMsg = URLEncoder.encode("Contraseña actualizada con éxito.", StandardCharsets.UTF_8);
-                res.redirect("/change-password?success=" + successMsg);
-                return "";
-
-            } catch (Exception e) {
-                System.err.println("Error al cambiar contraseña:");
-                e.printStackTrace();
-                
-                String errorMsg = URLEncoder.encode("Ocurrió un error interno al procesar el cambio.", StandardCharsets.UTF_8);
-                res.redirect("/change-password?error=" + errorMsg);
-                return "";
-            }
-        });
-        */
+*/
 
         post("/enrollment", (req, res) -> {
             Object userIdAttr = req.session().attribute("userId");
@@ -1188,6 +889,9 @@ public class App {
 
             return new ModelAndView(model, "plan_details.mustache");
         }, new MustacheTemplateEngine());
+
+
+
 
         post("/teacher/unassign", (req, res) -> {
             

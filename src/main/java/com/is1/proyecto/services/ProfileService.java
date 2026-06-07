@@ -1,6 +1,9 @@
 package com.is1.proyecto.services;
 
+import java.util.List;
+
 import com.is1.proyecto.models.Person;
+import com.is1.proyecto.models.Teacher;
 import com.is1.proyecto.models.User;
 
 /** Rutas --------------------------
@@ -14,6 +17,49 @@ import com.is1.proyecto.models.User;
 
 public class ProfileService {
 
+    public static class ProfileDataResult {
+        public boolean success;
+        public String fullName;
+        public Integer dni;
+        public String email;
+        public String degree;
+    }
+
+    // Método que concentra las búsquedas en la Base de Datos
+    public static ProfileDataResult getProfileData(Long userId, String activeRole) {
+        ProfileDataResult result = new ProfileDataResult();
+        
+        User currentUser = User.findById(userId);
+        if (currentUser == null) {
+            result.success = false;
+            return result;
+        }
+        
+        Person currentPerson = Person.findById(currentUser.get("person_id"));
+        if (currentPerson == null) {
+            result.success = false;
+            return result;
+        }
+
+        result.success = true;
+        result.fullName = currentPerson.getLastName() + ", " + currentPerson.getFirstName();
+        result.dni = currentPerson.getInteger("dni");
+        result.email = currentPerson.getString("email");
+
+        // Si es profesor, buscamos su título
+        if ("TEACHER".equals(activeRole)) {
+            List<Teacher> teachers = Teacher.find("person_id = ?", currentPerson.getId());
+            if (!teachers.isEmpty()) {
+                result.degree = teachers.get(0).getDegree();
+            }
+        }
+        
+        return result;
+    }
+
+    
+
+    //profile/verify-email    
     // Valida el formato del correo
     public static String validateNewEmail(String newEmail) {
         if (newEmail == null || newEmail.trim().isEmpty()) {
@@ -26,6 +72,7 @@ public class ProfileService {
         return null; // todo ok
     }
 
+    //profile/update-email
     // Busca al usuario y actualiza su correo en la BD
     public static String updateEmailInDatabase(Object userIdAttr, String newEmail) {
         try {

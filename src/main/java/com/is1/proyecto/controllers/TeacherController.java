@@ -2,6 +2,7 @@ package com.is1.proyecto.controllers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -133,6 +134,42 @@ public class TeacherController {
         }
         return "";
     }
+
+    //GET teacher/delete
+    public static ModelAndView renderDeleteForm(Request req, Response res) {
+        String query = req.queryParams("q");
+        int offset = 20;
+
+        List<Teacher> teachers = TeacherService.getTeachersForDeletion(query, offset);
+
+        Map<String, Object> model = Map.of(
+            "tituloPagina", "Baja de docentes",
+            "teachers", teachers,
+            "query", (query != null) ? query : "",
+            "offset", offset,
+            "successMessage", req.queryParamOrDefault("message", ""),
+            "errorMessage", req.queryParamOrDefault("error", "")
+        );
+
+        return new ModelAndView(model, "teacher_delete.mustache");
+    }
+
+    // POST /teacher/delete
+    public static Object handleDeleteTeacher(Request req, Response res) {
+        String teacherIdStr = req.queryParams("teacher_id");
+
+        String errorMsg = TeacherService.deleteTeacher(teacherIdStr);
+
+        if (errorMsg != null) {
+            res.redirect("/teacher/delete?error=" + URLEncoder.encode(errorMsg, StandardCharsets.UTF_8));
+        } else {
+            String successMsg = URLEncoder.encode("Docente eliminado correctamente del sistema.", StandardCharsets.UTF_8);
+            res.redirect("/teacher/delete?message=" + successMsg);
+        }
+        
+        return "";
+    }
+
 
     //GET "API" para buscar profes
     public static Object handleSearchTeachersAPI(Request req, Response res) {

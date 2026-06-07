@@ -3,20 +3,99 @@ package com.is1.proyecto.services;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
+import org.mindrot.jbcrypt.BCrypt;
+
+import com.is1.proyecto.models.Enrolled_Plan;
 import com.is1.proyecto.models.Person;
 import com.is1.proyecto.models.RecoverPasswordCode;
+import com.is1.proyecto.models.Student;
+import com.is1.proyecto.models.Teacher;
 import com.is1.proyecto.models.User;
 import com.is1.proyecto.utils.EmailSender;
 
 /** Rutas --------------------------
  *  /login (GET/POST), 
  *  /logout (GET), 
- *  /recover-passwor  (GET/POST), 
- *  /reset-passwor  (GET/POST), 
- *  /change-passwor  (GET/POST).
+ *  /recover-password  (GET/POST), 
+ *  /reset-password  (GET/POST), 
+ *  /change-password  (GET/POST).
  */
 
 public class AuthService {
+
+    // (el método solo puede devolver una cosa, 
+    // encapsulamos todo en una clase nueva, en lugar de usar un map).
+    public static class LoginServiceResult {
+        public boolean success;
+        public int status;
+        public String errorMessage;
+        public User ac;
+        public boolean isAdmin;
+        public boolean isStudent;
+        public boolean isTeacher;
+        public boolean isRegularStudent;
+        public int roleCount;
+    }
+
+    // POST: /login
+    public static LoginServiceResult authenticate(String username, String plainTextPassword) {
+        LoginServiceResult result = new LoginServiceResult();
+
+        // Validaciones básicas: campos de usuario y contraseña no pueden ser nulos o vacíos.
+        if (username == null || username.isEmpty() || plainTextPassword == null || plainTextPassword.isEmpty()) {
+            result.success = false;
+            result.status = 400;
+            result.errorMessage = "El nombre de usuario y la contraseña son requeridos.";
+            return result;
+        }
+
+        // Busca la cuenta en la base de datos por el nombre de usuario.
+        User ac = User.findFirst("name = ?", username);
+
+        // Si no se encuentra ninguna cuenta con ese nombre de usuario.
+        if (ac == null) {
+            result.success = false;
+            result.status = 401;
+            result.errorMessage = "Usuario o contraseña incorrectos.";
+            return result;
+        }
+
+        // Obtiene la contraseña hasheada almacenada en la base de datos.
+        String storedHashedPassword = ac.getString("password");
+
+        // Compara la contraseña en texto plano ingresada con la contraseña hasheada almacenada.
+        // BCrypt.checkpw hashea la plainTextPassword con el salt de storedHashedPassword y compara.
+        if (BCrypt.checkpw(plainTextPassword, storedHashedPassword)) {
+            // Autenticación exitosa.
+            result.success = true;
+            result.status = 200;
+            result.ac = ac;
+
+            Integer personId = ac.getInteger("person_id");
+            Integer isAdminInt = ac.getInteger("is_admin");
+            result.isAdmin = isAdminInt != null && isAdminInt == 1;
+
+            // -- Detectar roles -- 
+            Student studentModel = Student.findFirst("person_id = ?", personId);
+            result.isStudent = studentModel != null;
+            result.isTeacher = Teacher.findFirst("person_id = ?", personId) != null;
+            result.isRegularStudent = false;
+            result.roleCount = (result.isAdmin ? 1 : 0) + (result.isStudent ? 1 : 0) + (result.isTeacher ? 1:0);
+
+            if(result.isStudent){
+                result.isRegularStudent = Enrolled_Plan.findFirst("student_id = ?", studentModel.getId()) != null;
+            }
+
+            return result;
+        } else {
+            // Contraseña incorrecta.
+            result.success = false;
+            result.status = 401;
+            result.errorMessage = "Usuario o contraseña incorrectos.";
+            return result;
+        }
+    }
+
     // POST HANDLER: change-password
     public static String changePassword(Integer userId, String currentPassword, String newPassword, String confirmPassword) {
         //Validaciones iniciales
