@@ -676,8 +676,7 @@ public class TeacherController {
                 return new ModelAndView(model, "teacher_select_final.mustache");
             }
         }, engine);
-    }
-
+        
         post("/teacher/modify", (req, res) -> {
             // 1. Obtenemos el ID del docente
             String teacherIdStr = req.queryParams("teacher_id");
