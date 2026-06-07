@@ -604,10 +604,13 @@ public class App {
 
             String mode = req.queryParams("mode");
             String gradeMode = "";
+            boolean both = false;
             if(mode.equals("aprobadas")){
                 gradeMode = " AND fg.grade >= 5";
             } else if (mode.equals("desaprobadas")){
                 gradeMode = " AND fg.grade < 5";
+            } else {
+                both = true;
             }
             
             List<Map> subjects = Base.findAll(subjectsQuery + gradeMode, planId, student.getId(), student.getId());
@@ -636,8 +639,9 @@ public class App {
             }
 
             model.put("subjects", subjects);
-            model.put("hasSubjects", !subjects.isEmpty());
+            model.put("hasSubjects", !allSubjects.isEmpty());
             model.put("mode", mode);
+            model.put("both", both);
             model.put("totalAverage", totalAverage);
             model.put("approvedAverage", approvedAverage);
             return new ModelAndView(model, "academic_performance.mustache");
