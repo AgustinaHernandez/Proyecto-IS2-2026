@@ -1,0 +1,124 @@
+{{> header}}
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen p-8 transition-colors duration-300 flex flex-col justify-center items-center">
+    
+    <div class="w-full max-w-2xl mx-auto">
+        <div class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Apertura de Mesas de Final</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Configurá las fechas de los llamados para las materias.</p>
+        </div>
+
+        {{#successMessage}}
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg relative mb-6 shadow-sm">
+            <span class="block sm:inline font-medium">{{successMessage}}</span>
+        </div>
+        {{/successMessage}}
+
+        {{#errorMessage}}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6 shadow-sm">
+            <span class="block sm:inline font-medium">{{errorMessage}}</span>
+        </div>
+        {{/errorMessage}}
+
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <form action="/final/new" method="POST" class="space-y-6">
+                
+                <div>
+                    <label for="career_id" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">1. Seleccionar Carrera</label>
+                    <select id="career_id" required
+                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white transition-colors cursor-pointer">
+                        <option value="" disabled selected>-- Elegir Carrera --</option>
+                        {{#careers}}
+                        <option value="{{id}}">{{name}}</option>
+                        {{/careers}}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="subject_id" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">2. Seleccionar Materia</label>
+                    <select id="subject_id" name="subject_id" required disabled
+                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                        <option value="" disabled selected>-- Primero elija una carrera --</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="call" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">3. Instancia de Llamado</label>
+                        <select id="call" name="call" required
+                            class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white transition-colors cursor-pointer">
+                            <option value="Primero">Primer Llamado</option>
+                            <option value="Segundo">Segundo Llamado</option>
+                            <option value="Tercero">Tercer Llamado</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="date" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">4. Fecha del Examen</label>
+                        <input type="date" id="date" name="date" required 
+                            class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white transition-colors">
+                    </div>
+                </div>
+
+                <div class="pt-6">
+                    <button type="submit" 
+                        class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-500/50 transition-all shadow-md flex justify-center items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        Guardar Mesa de Examen
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="mt-8 text-center">
+            <a href="/dashboard" class="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-medium hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors">
+                &larr; Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    <script>
+        //Configurar la fecha mínima del calendario para que sea el día corriente
+        const dateInput = document.getElementById('date');
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.setAttribute('min', today);
+
+        //Cargar todas las materias
+        const allSubjects = [
+            {{#subjects}}
+            { id: "{{id}}", name: "{{name}}", career_id: "{{career_id}}" },
+            {{/subjects}}
+        ];
+
+        //Filtrar el selector de materias cuando cambia la carrera
+        const careerSelect = document.getElementById('career_id');
+        const subjectSelect = document.getElementById('subject_id');
+
+        careerSelect.addEventListener('change', function() {
+            const selectedCareerId = this.value;
+            
+            //Limpiar el select de materias
+            subjectSelect.innerHTML = '<option value="" disabled selected>-- Seleccione una materia --</option>';
+            
+            //Filtrar el array de materias buscando las de esa carrera
+            const filteredSubjects = allSubjects.filter(sub => sub.career_id === selectedCareerId);
+            
+            //Si hay materias, habilitar el select y agregarlas
+            if (filteredSubjects.length > 0) {
+                subjectSelect.disabled = false;
+                filteredSubjects.forEach(sub => {
+                    const option = document.createElement('option');
+                    option.value = sub.id;
+                    option.textContent = sub.name;
+                    subjectSelect.appendChild(option);
+                });
+            } else {
+                //Si la carrera no tiene materias
+                subjectSelect.disabled = true;
+                subjectSelect.innerHTML = '<option value="" disabled selected>No hay materias para esta carrera</option>';
+            }
+        });
+    </script>
+</body>
+</html>

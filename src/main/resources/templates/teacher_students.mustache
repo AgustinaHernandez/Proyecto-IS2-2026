@@ -3,7 +3,7 @@
 <body class="bg-gray-100 dark:bg-gray-900 min-h-screen p-8 transition-colors duration-300">
     
     <div class="max-w-4xl mx-auto">
-        <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-6">Baja de Docentes</h1>
+        <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-6">Alumnos Inscriptos {{#subjectName}}- {{subjectName}}{{/subjectName}}</h1>
 
         {{#successMessage}}
         <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">
@@ -18,12 +18,17 @@
         {{/errorMessage}}
 
         <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow mb-8 border border-gray-200 dark:border-gray-700">
-            <form action="/teacher/delete" method="get" class="flex gap-4">
+            <form action="/teacher/subject-students" method="get" class="flex gap-4">
+                
+                {{#subjectId}}
+                <input type="hidden" name="subject_id" value="{{subjectId}}">
+                {{/subjectId}}
+
                 <div class="flex-grow">
-                    <input type="text" name="q" value="{{query}}" placeholder="Buscar por Nombre, Apellido o DNI..." 
-                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <input type="text" name="q" value="{{query}}" placeholder="Buscar alumno por nombre, apellido o DNI..." 
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white">
                 </div>
-                <button type="submit" class="bg-gray-600 text-white py-2 px-6 rounded-md hover:bg-gray-700 transition-colors">
+                <button type="submit" class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 transition-colors">
                     Buscar
                 </button>
             </form>
@@ -35,33 +40,32 @@
                     <tr class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                         <th class="py-3 px-6 text-sm font-semibold text-gray-700 dark:text-gray-300">DNI</th>
                         <th class="py-3 px-6 text-sm font-semibold text-gray-700 dark:text-gray-300">Nombre Completo</th>
-                        <th class="py-3 px-6 text-sm font-semibold text-gray-700 dark:text-gray-300">Acción</th>
+                        <th class="py-3 px-6 text-sm font-semibold text-gray-700 dark:text-gray-300">Email</th>
+                        <th class="py-3 px-6 text-sm font-semibold text-gray-700 dark:text-gray-300">Condición</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     
-                    {{#teachers}}
-                    <tr class="hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                    {{#students}}
+                    <tr class="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                         <td class="py-3 px-6 text-sm text-gray-900 dark:text-white font-medium">{{getDNI}}</td>
                         <td class="py-3 px-6 text-sm text-gray-700 dark:text-gray-300">{{getFullNameString}}</td>
-                        <td class="py-3 px-6 text-sm">
-                            <form action="/teacher/delete" method="post" onsubmit=" return confirm('¿Estas seguro de que deseas eliminar a {{getFullNameString}}?');">
-                                <input type="hidden" name="teacher_id" value="{{getId}}">
-                                <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium bg-red-100 dark:bg-red-900/30 px-3 py-1 rounded">
-                                    Eliminar
-                                </button>
-                            </form>
+                        <td class="py-3 px-6 text-sm text-gray-700 dark:text-gray-300">{{getEmail}}</td>
+                        <td class="py-3 px-6 text-sm text-gray-700 dark:text-gray-300">
+                            <span class="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded text-xs font-semibold">
+                                {{getCondition}}
+                            </span>
                         </td>
                     </tr>
-                    {{/teachers}}
+                    {{/students}}
                     
-                    {{^teachers}}
+                    {{^students}}
                     <tr>
-                        <td colspan="3" class="py-8 text-center text-gray-500 dark:text-gray-400">
-                            No se encontraron docentes con esos datos
+                        <td colspan="4" class="py-8 text-center text-gray-500 dark:text-gray-400">
+                            No se encontraron alumnos inscriptos con esos datos
                         </td>
                     </tr>
-                    {{/teachers}}
+                    {{/students}}
 
                 </tbody>
             </table>
@@ -69,13 +73,13 @@
 
         <div class="mt-6 flex justify-center items-center gap-4">
             {{#hasPrev}}
-            <a href="/teacher/delete?q={{query}}&page={{prevPage}}" class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium">
+            <a href="/teacher/subject-students?q={{query}}{{#subjectId}}&subject_id={{subjectId}}{{/subjectId}}&page={{prevPage}}" class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium">
                 &larr; Anterior
             </a>
             {{/hasPrev}}
 
             {{#hasNext}}
-            <a href="/teacher/delete?q={{query}}&page={{nextPage}}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors font-medium">
+            <a href="/teacher/subject-students?q={{query}}{{#subjectId}}&subject_id={{subjectId}}{{/subjectId}}&page={{nextPage}}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors font-medium">
                 Siguiente &rarr;
             </a>
             {{/hasNext}}

@@ -42,3 +42,4 @@ target/
 # Ignorar bases de datos de SQLite
 *.db
 *.sqlite
+credentials.json

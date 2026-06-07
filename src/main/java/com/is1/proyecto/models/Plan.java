@@ -1,5 +1,5 @@
 
-package com.is1.proyecto.models;                                               // Controlar
+package com.is1.proyecto.models;
 
 import java.util.List;
 

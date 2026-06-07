@@ -1,0 +1,88 @@
+{{> header}}
+
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen p-8 transition-colors duration-300 flex flex-col justify-center items-center">
+    
+    <div class="w-full max-w-xl mx-auto">
+        
+        <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-6 text-center">Seleccionar Una Materia</h1>
+
+        {{#errorMessage}}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6 shadow-sm flex items-center gap-3">
+            <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+            </svg>
+            <span class="block sm:inline font-medium">{{errorMessage}}</span>
+        </div>
+        {{/errorMessage}}
+
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            
+            {{#hasSubjects}}
+            <p class="text-gray-600 dark:text-gray-400 mb-6 text-base text-center">
+                Seleccione una materia para consultar el listado de alumnos inscriptos.
+            </p>
+
+            <form action="/teacher/subject-students" method="GET" class="space-y-6">
+                <div>
+                    <label for="subject_id" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Materia asignada
+                    </label>
+                    <div class="relative">
+                        <select id="subject_id" name="subject_id" required
+                            class="w-full appearance-none px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white transition-colors cursor-pointer text-base">
+                            <option value="" disabled selected>-- Despliegue para elegir --</option>
+                            
+                            {{#subjects}}
+                            <option value="{{getId}}">{{getName}}</option>
+                            {{/subjects}}
+                            
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500 dark:text-gray-400">
+                            <svg class="fill-current h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4">
+                    <button type="submit" 
+                        class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-500/50 transition-all shadow-md flex justify-center items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                        Ver Alumnos
+                    </button>
+                </div>
+            </form>
+            {{/hasSubjects}}
+
+            {{^hasSubjects}}
+            <div class="text-center py-6">
+                <div class="bg-gray-100 dark:bg-gray-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="h-8 w-8 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Sin materias asignadas</h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    Actualmente no estás dictando ninguna materia en el sistema. Contactá a un administrador si esto es un error.
+                </p>
+            </div>
+            {{/hasSubjects}}
+
+        </div>
+
+        <div class="mt-8 text-center">
+            <a href="/dashboard" class="inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 font-medium hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Volver al Dashboard
+            </a>
+        </div>
+        
+    </div>
+
+</body>
+</html>
