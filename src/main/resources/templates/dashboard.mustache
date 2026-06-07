@@ -103,7 +103,7 @@
                 </div>
             </div>
             
-            <!-- Alta y baja docente -->
+            <!-- Alta, modificacion y baja docente -->
             {{#isActiveAdmin}}
             <div class="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden">
                 <div class="absolute top-0 right-0 w-24 h-24 bg-yellow-50 dark:bg-yellow-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
@@ -115,6 +115,10 @@
                     <p class="text-gray-500 dark:text-gray-400 text-sm mb-5 leading-relaxed">Manejo de equipo docente (alta y baja).</p>
                     <a href="/teacher/create" class="inline-flex items-center text-sm font-semibold text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 transition-colors">
                         Agregar Profesor <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </a>
+                    <br>
+                    <a href="/teacher/modify" class="inline-flex items-center text-sm font-semibold text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 transition-colors">
+                        Modificar Datos Profesor <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                     </a>
                     <br>
                     <a href="/teacher/delete" class="inline-flex items-center text-sm font-semibold text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 transition-colors">
