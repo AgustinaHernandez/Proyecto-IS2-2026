@@ -7,7 +7,6 @@ import static spark.Spark.*; // Importa los métodos estáticos principales de S
 
 // Importaciones específicas para ActiveJDBC (ORM para la base de datos)
 import org.javalite.activejdbc.Base; // Clase central de ActiveJDBC para gestionar la conexión a la base de datos.
-import org.mindrot.jbcrypt.BCrypt; // Utilidad para hashear y verificar contraseñas de forma segura.
 
 // Importaciones de Spark para renderizado de plantillas
 import spark.ModelAndView; // Representa un modelo de datos y el nombre de la vista a renderizar.
@@ -24,8 +23,6 @@ import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 import com.is1.proyecto.controllers.*;
 import com.is1.proyecto.models.*;
-import com.is1.proyecto.utils.EmailSender;
-import com.is1.proyecto.utils.PasswordGenerator;
 
 
 /**
@@ -33,11 +30,6 @@ import com.is1.proyecto.utils.PasswordGenerator;
  * Configura las rutas, filtros y el inicio del servidor web.
  */
 public class App {
-
-    // Instancia estática y final de ObjectMapper para la serialización/deserialización JSON.
-    // Se inicializa una sola vez para ser reutilizada en toda la aplicación.
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-
     /**
      * Método principal que se ejecuta al iniciar la aplicación.
      * Aquí se configuran todas las rutas y filtros de Spark.
@@ -69,6 +61,7 @@ public class App {
         before("/career/create", (req, res) -> checkAdminAccess(req, res));
         before("/career/new", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/unassign", (req, res) -> checkAdminAccess(req, res));
+        before("/student/create", (req, res) -> checkAdminAccess(req, res));
 
         // --- Filtro 'after-after' para cerrar la conexión a la base de datos pase lo que pase---
         afterAfter("/*", (req, res) -> {
@@ -98,6 +91,8 @@ public class App {
         // Dashboard
         get("/dashboard", DashboardController::renderDashboard, new MustacheTemplateEngine());
         
+        // Settings
+        get("/settings", ProfileController::renderSettings, new MustacheTemplateEngine());
 
         // Alta de carrera
         get("/career/create", CareerController::renderCreateForm, new MustacheTemplateEngine());
@@ -116,6 +111,8 @@ public class App {
         get("/plans", PlanController::renderQueryForm, new MustacheTemplateEngine());
         post("/plans", PlanController::handleQueryPlan, new MustacheTemplateEngine());
 
+        // Perfil
+        get("/profile", ProfileController::renderProfile, new MustacheTemplateEngine());
         // Cambiar email (y verificación con código enviado por mail)
         get("/profile/verify-email", ProfileController::renderVerifyEmail, new MustacheTemplateEngine());
         // POST: Pedir el cambio de correo y enviar código
@@ -153,6 +150,12 @@ public class App {
         //POST: Alta de teacher
         post("/teacher/assign", TeacherController::handleTeacherAssignation);
 
+
+        //GET: Alta de estudiantes
+        get("/student/create", StudentController::renderCreationForm, new MustacheTemplateEngine());
+        //POST: Alta de estudiantes
+        post("/student/create", StudentController::handleStudentCreation);
+
         //GET: Baja de estudiantes
         get("/student/delete", StudentController::renderDeleteForm, new MustacheTemplateEngine());
         //POST: Baja de estudiantes
@@ -180,154 +183,8 @@ public class App {
         // POST: Maneja el envío del formulario de inicio de sesión.
         post("/", AuthController::handleLogin, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta POST
 
-
-        
         post("/set-role", ProfileController::handleSetRole);
         
-        // GET: Página de configuración
-        get("/settings", (req, res) -> {
-            Map<String, Object> model = new HashMap<>();
-            
-            // Verificar sesión (opcional, pero recomendado)
-            if (req.session().attribute("loggedIn") == null) {
-                res.redirect("/");
-                return null;
-            }
-            model.put("tituloPagina", "Configuración");
-            return new ModelAndView(model, "settings.mustache");
-        }, new MustacheTemplateEngine());
-
-/*
-        // GET: Ruta para cerrar la sesión del usuario.
-        get("/logout", (req, res) -> {
-            // Invalida completamente la sesión del usuario.
-            // Esto elimina todos los atributos guardados en la sesión y la marca como inválida.
-            // La cookie JSESSIONID en el navegador también será gestionada para invalidarse.
-            req.session().invalidate();
-
-            System.out.println("DEBUG: Sesión cerrada. Redirigiendo a /");
-
-            // Redirige al usuario a la página de login con un mensaje de éxito.
-            res.redirect("/");
-
-            return null; // Importante retornar null después de una redirección.
-        });
- */
-/*
-        // GET: Muestra el formulario de inicio de sesión (login).
-        // Nota: Esta ruta debería ser capaz de leer también mensajes de error/éxito de los query params
-        // si se la usa como destino de redirecciones. 
-        get("/", (req, res) -> {
-            Map<String, Object> model = new HashMap<>();
-            String errorMessage = req.queryParams("error");
-            if (errorMessage != null && !errorMessage.isEmpty()) {
-                model.put("errorMessage", errorMessage);
-            }
-            String successMessage = req.queryParams("message");
-            if (successMessage != null && !successMessage.isEmpty()) {
-                model.put("successMessage", successMessage);
-            }
-            return new ModelAndView(model, "login.mustache");
-        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
- */
-
-
-        get("/profile", (req, res) -> {
-            Map<String, Object> model = new HashMap<>();
-
-            Object rawUserId = req.session().attribute("userId");
-            String currentUsername = req.session().attribute("currentUserUsername");
-            String role = req.session().attribute("activeRole");
-            Long userId = null;
-
-            if (rawUserId != null) {
-                try {
-                    userId = Long.valueOf(rawUserId.toString()); 
-                } catch (NumberFormatException e) {
-                    System.err.println("ERROR: El userId en sesión no es un número válido. Forzando logout. " + e.getMessage());
-                    res.redirect("/logout");
-                    return null;
-                }
-            }
-            
-            if (userId == null) {
-                res.redirect("/?error=Acceso no autorizado.");
-                return null;
-            }
-
-            User currentUser = User.findById(userId);
-
-            if (currentUser == null) {
-                res.redirect("/logout");
-                return null;
-            }
-            
-            Person currentPerson = Person.findById(currentUser.get("person_id"));
-            String fullName = (String) currentPerson.getLastName() + ", " + (String) currentPerson.getFirstName();
-
-            model.put("userId", currentUser.getId());
-            model.put("username", currentUsername); 
-            model.put("fullName", fullName);
-            model.put("dni", currentPerson.getDNI());
-            model.put("email", currentPerson.getMail());
-            model.put("tituloPagina", "Perfil de Usuario");
-
-            String error = req.queryParams("error");
-            if (error != null && !error.isEmpty()) {
-                model.put("errorMessage", error);
-            }
-            String success = req.queryParams("success");
-            if (success != null && !success.isEmpty()) {
-                model.put("successMessage", success);
-            }
-
-            String degree = null;
-            if(role.equals("TEACHER")){ //Si es teacher, tiene título además de los otros datos
-                List<Teacher> teacher = Teacher.find("person_id = ?", currentPerson.getID());
-                degree = teacher.get(0).getDegree();         
-            }
-            model.put("degree", degree); //Si lo mapea como null, el formulario lo detecta y no lo muestra (ver perfil_usuario.mustache)
-            return new ModelAndView(model, "perfil_usuario.mustache");
-        }, new MustacheTemplateEngine());
-
-/*
-        get("/plan/new",(req, res) -> { 
-            List<Plan> plans = Plan.findAll().include(Career.class);
-
-            List<Career> careers = Career.findAll(); 
-
-            Map<String, Object> model = Map.of(
-                "plans", plans,
-                "careers",careers,
-                "tituloPagina", "Nuevo plan",
-                "errorMessage", req.queryParamOrDefault("errorMessage", ""),
-                "successMessage", req.queryParamOrDefault("successMessage", "")
-            );
-            return new ModelAndView(model, "plan_new.mustache");
-
-        }, new MustacheTemplateEngine());
- */
-
-        get("/student/create", (req, res) -> {
-            Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
-
-            // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Carrera agregada!)
-            String successMessage = req.queryParams("message");
-            if (successMessage != null && !successMessage.isEmpty()) {
-                model.put("successMessage", successMessage);
-            }
-
-            // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
-            String errorMessage = req.queryParams("error");
-            if (errorMessage != null && !errorMessage.isEmpty()) {
-                model.put("errorMessage", errorMessage);
-            }
-
-            // Renderiza la plantilla 'career_form.mustache' con los datos del modelo.
-            return new ModelAndView(model, "student_form.mustache");
-        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
-        
-
         get("/enrollment", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
             
@@ -407,296 +264,6 @@ public class App {
 
             return new ModelAndView(model, "teacher_unassign.mustache");
         }, new MustacheTemplateEngine());
-
-
-        // --- Rutas POST para manejar envíos de formularios y APIs ---
-
-
-/*
-        // POST: Maneja el envío del formulario de inicio de sesión.
-        post("/", (req, res) -> {
-            Map<String, Object> model = new HashMap<>(); // Modelo para la plantilla de login o dashboard.
-            model.put("tituloPagina","Iniciar Sesión");
-
-            String username = req.queryParams("username");
-            String plainTextPassword = req.queryParams("password");
-
-            // Validaciones básicas: campos de usuario y contraseña no pueden ser nulos o vacíos.
-            if (username == null || username.isEmpty() || plainTextPassword == null || plainTextPassword.isEmpty()) {
-                res.status(400); // Bad Request.
-                model.put("errorMessage", "El nombre de usuario y la contraseña son requeridos.");
-                return new ModelAndView(model, "login.mustache"); // Renderiza la plantilla de login con error.
-            }
-
-            // Busca la cuenta en la base de datos por el nombre de usuario.
-            User ac = User.findFirst("name = ?", username);
-
-            // Si no se encuentra ninguna cuenta con ese nombre de usuario.
-            if (ac == null) {
-                res.status(401); // Unauthorized.
-                model.put("errorMessage", "Usuario o contraseña incorrectos."); // Mensaje genérico por seguridad.
-                return new ModelAndView(model, "login.mustache"); // Renderiza la plantilla de login con error.
-            }
-
-            // Obtiene la contraseña hasheada almacenada en la base de datos.
-            String storedHashedPassword = ac.getString("password");
-
-            // Compara la contraseña en texto plano ingresada con la contraseña hasheada almacenada.
-            // BCrypt.checkpw hashea la plainTextPassword con el salt de storedHashedPassword y compara.
-            if (BCrypt.checkpw(plainTextPassword, storedHashedPassword)) {
-                // Autenticación exitosa.
-                res.status(200); // OK.
-
-                Integer personId = ac.getInteger("person_id");
-                Integer isAdminInt = ac.getInteger("is_admin");
-                Boolean isAdmin = isAdminInt != null && isAdminInt == 1;
-
-                // -- Detectar roles -- 
-                Student studentModel = Student.findFirst("person_id = ?", personId);
-                boolean isStudent = studentModel != null;
-                boolean isTeacher = Teacher.findFirst("person_id = ?", personId) != null;
-                boolean isRegularStudent = false;
-                int roleCount = (isAdmin ? 1 : 0) + (isStudent ? 1 : 0) + (isTeacher ? 1:0);
-
-
-                if(isStudent){
-                    isRegularStudent = Enrolled_Plan.findFirst("student_id = ?",studentModel.getId()) != null;
-                }
-
-                // --- Gestión de Sesión ---
-                req.session(true).attribute("currentUserUsername", username); // Guarda el nombre de usuario en la sesión.
-                req.session().attribute("userId", ac.getId()); // Guarda el ID de la cuenta en la sesión (útil).
-                req.session().attribute("loggedIn", true); // Establece una bandera para indicar que el usuario está logueado.
-                // Roles
-                req.session().attribute("isAdmin", isAdmin); 
-                req.session().attribute("isTeacher", isTeacher);
-                req.session().attribute("isStudent", isStudent);
-                req.session().attribute("isRegularStudent", isRegularStudent);
-                // Asignar rol activo
-                if(isAdmin) req.session().attribute("activeRole","ADMIN");
-                else if(isTeacher) req.session().attribute("activeRole","TEACHER");
-                else if(isStudent) req.session().attribute("activeRole","STUDENT");
-                else req.session().attribute("activeRole","NONE");
-
-                String activeRole = (String) req.session().attribute("activeRole");
-
-                System.out.println("DEBUG Login exitoso para " + username + " (Admin: " + isAdmin + ")");
-                
-                System.out.println("DEBUG: Login exitoso para la cuenta: " + username);
-                System.out.println("DEBUG: ID de Sesión: " + req.session().id());
-
-                model.put("username", username); // Añade el nombre de usuario al modelo para el dashboard.
-                model.put("isAdmin", isAdmin);
-                model.put("isTeacher", isTeacher);
-                model.put("isStudent", isStudent);
-                model.put("hasMultipleRoles", roleCount > 1);
-                model.put("activeRole",activeRole);            
-
-
-                model.put("isActiveAdmin", "ADMIN".equals(activeRole));
-                model.put("isActiveTeacher", "TEACHER".equals(activeRole));
-                model.put("isActiveStudent", "STUDENT".equals(activeRole));
-
-                model.put("tituloPagina", "Dashboard - Bienvenido");
-                // Renderiza la plantilla del dashboard tras un login exitoso.
-                return new ModelAndView(model, "dashboard.mustache");
-            } else {
-                // Contraseña incorrecta.
-                res.status(401); // Unauthorized.
-                System.out.println("DEBUG: Intento de login fallido para: " + username);
-                model.put("errorMessage", "Usuario o contraseña incorrectos."); // Mensaje genérico por seguridad.
-                return new ModelAndView(model, "login.mustache"); // Renderiza la plantilla de login con error.
-            }
-        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta POST.
-*/
-        
-/*
-        post("/plan/new", (req, res) -> {
-                     
-            String careerId = req.queryParams("career_id"); // id de la carrera seleccionada
-            String statePlan = req.queryParams("state");   //estado del plan
-            String versionPlan = req.queryParams("version"); // version del plan
-           
-            // Validaciones básicas: campos no pueden ser nulos o vacíos.
-
-             if (careerId == null || careerId.isEmpty()){
-               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-               res.redirect("/career/create?error=" + errorMsg);
-               return "";
-            }
-
-             if (statePlan == null || statePlan.isEmpty()){
-               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-               res.redirect("/career/create?error=" + errorMsg);
-               return "";
-
-            }
-
-            if (versionPlan == null || versionPlan.isEmpty()){
-               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-               res.redirect("/career/create?error=" + errorMsg);
-               return "";  
-
-            }
-
-            //Principal
-            try {
-                // Intenta crear y guardar el nuevo plan de estudios  en la base de datos.
-                
-                Base.openTransaction();  // Iniciamos la transaccion
-
-                Plan np = new Plan(); // Crea una nueva instancia del modelo PLan.
-                
-                np.set("career_id",careerId);
-                np.set("state",statePlan);
-                np.set("version",versionPlan);
-                np.saveIt();
-
-                Base.commitTransaction();               
-
-                res.status(201); // Código de estado HTTP 201 (Created) para una creación exitosa.
-                // Redirige al formulario de creación con un mensaje de éxito.
-                String successMsg = URLEncoder.encode("Plan "+versionPlan+" registrado correctamente.",StandardCharsets.UTF_8);
-                res.redirect("/plan/new?successMessage="+successMsg);
-                return ""; // Retorna una cadena vacía.
-
-
-           } catch (Exception e) {
-               // Si ocurre cualquier error durante la operación de DB (ej. código de carrera duplicado),
-               // se captura aquí y se redirige con un mensaje de error.
-               Base.rollbackTransaction(); // Si falla algo deshace
-               e.printStackTrace(); // Imprime el stack trace para depuración.
-               res.status(500); // Código de estado HTTP 500 (Internal Server Error).
-               String errorMsg = URLEncoder.encode("ERROR: id de plan de carrera ya existente o error interno.", StandardCharsets.UTF_8);
-               res.redirect("/plan/new?errorMessage="+errorMsg);
-               return ""; // Retorna una cadena vacía.
-           }
-        });
- */
-
-        post("/student/new", (req, res) -> {
-            String firstname = req.queryParams("firstname").trim();
-            String lastname = req.queryParams("lastname").trim();
-            String dniStr = req.queryParams("dni").trim();
-            String email = req.queryParams("email").trim();
-            
-            // Validaciones básicas: campos no pueden ser nulos o vacíos.
-            if (firstname == null || firstname.isEmpty()
-                || lastname == null || lastname.isEmpty() || email == null || email.isEmpty()
-                || dniStr == null || dniStr.isEmpty()
-            ) {
-               String errorMsg = URLEncoder.encode("Todos los campos son requeridos.", StandardCharsets.UTF_8);
-               res.redirect("/student/create?error=" + errorMsg);
-               return "";
-            }
-            //Validación de nombre
-            String result = firstname.replaceAll("\\d", ""); //Quitar todos los números del firstname
-            if(result.length() != firstname.length()){ //Chequear si cambió la longitud
-                String errorMsg = URLEncoder.encode("El nombre no puede contener números.", StandardCharsets.UTF_8);
-                res.redirect("/student/create?error=" + errorMsg);
-                return "";
-            }
-            //Validación de apellido
-            result = lastname.replaceAll("\\d", ""); //Quitar todos los números del lastname
-            if(result.length() != lastname.length()){ //Chequear si cambió la longitud
-                String errorMsg = URLEncoder.encode("El apellido no puede contener números.", StandardCharsets.UTF_8);
-                res.redirect("/student/create?error=" + errorMsg);
-                return "";
-            }
-            //Validación de mail
-            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
-            if(!email.matches(emailRegex)) {
-                String errorMsg = URLEncoder.encode("Ingrese un correo electrónico válido (ej: usuario@dominio.com).", StandardCharsets.UTF_8);
-                res.redirect("/student/create?error=" + errorMsg);
-                return "";
-            }
-            //Validación de DNI
-            Integer dni = 0;
-            try {
-                dni = Integer.parseInt(dniStr);
-                if (dni <= 0) throw new IllegalArgumentException("DNI inválido");
-            } catch (Exception e) {
-                res.status(400);
-                String errorMsg = URLEncoder.encode("El DNI debe ser un número válido.", StandardCharsets.UTF_8);
-                res.redirect("/student/create?error=" + errorMsg);
-                return "";
-            }
-
-            //Principal
-            try {
-                Base.openTransaction();
-
-                Person p = Person.findFirst("dni = ?", dni);
-                if (p == null) {
-                    p = new Person(); 
-                    p.set("first_name", firstname);
-                    p.set("last_name", lastname);
-                    p.set("dni", dni);
-                    p.set("email", email);
-                    p.saveIt();
-                } else {
-                    Student existingStudent = Student.findFirst("person_id = ?", p.getId());
-                    if (existingStudent != null) {
-                        Base.rollbackTransaction();
-                        String errorMsg = URLEncoder.encode("Esta persona ya está registrada como estudiante.", StandardCharsets.UTF_8);
-                        res.redirect("/student/create?error=" + errorMsg);
-                        return "";
-                    }
-                }
-                Student ac = new Student();
-                ac.set("person_id", p.getId());
-                ac.saveIt();
-                User u = User.findFirst("name = ?", dniStr);
-                String randomPassword = PasswordGenerator.generateSecurePassword(8);
-                boolean isNewUser = (u == null);
-                if (isNewUser) {
-                    u = new User();
-                    String hashedPassword = BCrypt.hashpw(randomPassword, BCrypt.gensalt());
-                    u.set("name", dniStr);
-                    u.set("password", hashedPassword); 
-                    u.set("person_id", p.getId());
-                    u.set("is_admin", 0);
-                    u.saveIt();
-                }
-                Base.commitTransaction();               
-                
-                if (isNewUser) {
-                    // El mail original con credenciales
-                    try { EmailSender.sendGenericAccountCreationMail(email, dniStr, firstname, lastname, randomPassword); } 
-                    catch (Exception e) { e.printStackTrace(); }
-                } else {
-                    // El usuario ya existía, le avisamos que le agregaron el perfil
-                    try { EmailSender.sendStudentRoleAddedMail(email, firstname, lastname); } 
-                    catch (Exception e) { e.printStackTrace(); }
-                }
-
-                res.status(201); 
-                String successMsgText = "Estudiante " + firstname + " " + lastname + " registrado correctamente.";
-                String successMsg = URLEncoder.encode(successMsgText, StandardCharsets.UTF_8);
-
-                res.redirect("/student/create?message=" + successMsg);
-                return "";
-
-           } catch (Exception e) {
-                Base.rollbackTransaction(); 
-                e.printStackTrace(); 
-                res.status(500); 
-                String errorMsg = URLEncoder.encode("ERROR interno al procesar el registro.", StandardCharsets.UTF_8);
-                res.redirect("/student/create?error=" + errorMsg);
-                return ""; 
-           }
-        });
-/*
-        post("/set-role", (req, res) -> {
-            String selectedRole = req.queryParams("role");
-            System.out.println(selectedRole);            
-            if (selectedRole != null && !selectedRole.isEmpty()) {
-                req.session().attribute("activeRole", selectedRole);
-            }
-            res.redirect("/dashboard");
-            return "";
-        });
-*/
 
         post("/enrollment", (req, res) -> {
             Object userIdAttr = req.session().attribute("userId");

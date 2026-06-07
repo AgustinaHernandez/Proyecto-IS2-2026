@@ -1,8 +1,16 @@
 package com.is1.proyecto.services;
 
-import org.javalite.activejdbc.Base;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
+import org.javalite.activejdbc.Base;
+import org.mindrot.jbcrypt.BCrypt;
+
+import com.is1.proyecto.models.Person;
 import com.is1.proyecto.models.Student;
+import com.is1.proyecto.models.User;
+import com.is1.proyecto.utils.EmailSender;
+import com.is1.proyecto.utils.PasswordGenerator;
 
 /** Rutas --------------------------
  * /student/create (GET/POST), 
@@ -12,6 +20,61 @@ import com.is1.proyecto.models.Student;
 
 
 public class StudentService {
+    public static String createStudent(String firstName, String lastName, String dni, String email){
+        try {
+            Base.openTransaction();
+
+            Person p = Person.findFirst("dni = ?", dni);
+            if (p == null) {
+                p = new Person(); 
+                p.set("first_name", firstName);
+                p.set("last_name", lastName);
+                p.set("dni", dni);
+                p.set("email", email);
+                p.saveIt();
+            } else {
+                Student existingStudent = Student.findFirst("person_id = ?", p.getId());
+                if (existingStudent != null) {
+                    Base.rollbackTransaction();
+                    return "Esta persona ya está registrada como estudiante.";
+                }
+            }
+            Student ac = new Student();
+            ac.set("person_id", p.getId());
+            ac.saveIt();
+            User u = User.findFirst("name = ?", dni);
+            String randomPassword = PasswordGenerator.generateSecurePassword(8);
+            boolean isNewUser = (u == null);
+            if (isNewUser) {
+                u = new User();
+                String hashedPassword = BCrypt.hashpw(randomPassword, BCrypt.gensalt());
+                u.set("name", dni);
+                u.set("password", hashedPassword); 
+                u.set("person_id", p.getId());
+                u.set("is_admin", 0);
+                u.saveIt();
+            }
+            Base.commitTransaction();               
+            
+            if (isNewUser) {
+                // El mail original con credenciales
+                try { EmailSender.sendGenericAccountCreationMail(email, dni, firstName, lastName, randomPassword); } 
+                catch (Exception e) { e.printStackTrace(); }
+            } else {
+                // El usuario ya existía, le avisamos que le agregaron el perfil
+                try { EmailSender.sendStudentRoleAddedMail(email, firstName, lastName); } 
+                catch (Exception e) { e.printStackTrace(); }
+            }
+
+            return null;
+        } catch (Exception e) {
+            Base.rollbackTransaction(); 
+            e.printStackTrace(); 
+            
+            return "Error interno al procesar el registro."; 
+        }
+    }
+
     /**
      *  ---------------- STUDENT DELETE ------------------------------------------
      */
