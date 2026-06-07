@@ -25,7 +25,7 @@ import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 import com.is1.proyecto.controllers.*;
 import com.is1.proyecto.models.*;
-import com.is1.proyecto.models.controllers.TeacherController;
+import com.is1.proyecto.models.controllers.TeacherControllerOld;
 import com.is1.proyecto.utils.EmailSender;
 import com.is1.proyecto.utils.PasswordGenerator;
 
@@ -93,7 +93,7 @@ public class App {
 
         MustacheTemplateEngine engine = new MustacheTemplateEngine();
 
-        TeacherController.registrarRutas(engine, objectMapper);
+        TeacherControllerOld.registrarRutas(engine, objectMapper);
         
 
         // --- Rutas GET para renderizar formularios y páginas HTML ---
@@ -123,6 +123,36 @@ public class App {
         post("/profile/verify-email", ProfileController::handleVerifyEmailCode);
 
 
+        // GET: Recuperar contraseña (mandar código)
+        get("/recover-password", AuthController::renderRecoverPassword, new MustacheTemplateEngine());
+        // POST: Recuperar contraseña (mandar código)
+        post("/recover-password", AuthController::handleRecoverPasswordRequest);
+        // GET: Recuperar contraseña (insertar código y contraseña vieja)
+        get("/reset-password", AuthController::renderResetPassword, new MustacheTemplateEngine());
+        // POST: Recuperar contraseña
+        post("/reset-password", AuthController::handleResetPasswordRequest);
+
+
+        // GET: Cambiar contraseña (estando logeado)
+        get("/change-password", AuthController::renderChangePassword, new MustacheTemplateEngine());
+        // POST: Cambiar contraseña (estando logeado)
+        post("/change-password", AuthController::handleChangePassword);
+
+
+        //GET: Alta de teacher
+        get("/teacher/create", TeacherController::renderTeacherCreation, new MustacheTemplateEngine());
+        //POST: Alta de teacher
+        post("/teacher/create", TeacherController::handleTeacherCreation);
+
+
+        //GET: Asignación de teacher a materia
+        get("/teacher/assign", TeacherController::renderTeacherAssign, new MustacheTemplateEngine());
+        //GET "API": Buscar profesores
+        get("/api/teachers/search", TeacherController::handleSearchTeachersAPI);
+        //POST: Alta de teacher
+        post("/teacher/assign", TeacherController::handleTeacherAssignation);
+        
+        /*
         //GET: Muestra el formulario de recuperación de contraseña.
         get("/recover-password", (req, res) -> {
 
@@ -146,7 +176,10 @@ public class App {
 
             return new ModelAndView(model, "reset_password.mustache");
         }, new MustacheTemplateEngine());
+        */
 
+        /*¨
+        
         //GET: Muestra el formulario de cambio de contraseña "voluntario" (estando logeado)
         get("/change-password", (req, res) -> {
             String currentUsername = req.session().attribute("currentUserUsername");
@@ -173,7 +206,7 @@ public class App {
 
             return new ModelAndView(model, "change_password.mustache");
         }, new MustacheTemplateEngine());
-
+        */
 
         // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
         // Requiere que el usuario esté autenticado.
@@ -854,7 +887,7 @@ public class App {
             res.redirect("/dashboard");
             return "";
         });
-
+        /*
         post("/recover-password", (req, res) -> {
             String email = req.queryParams("email");
 
@@ -902,7 +935,8 @@ public class App {
             res.redirect("/reset-password");
             return "";
         });
-
+        */
+        /*
         post("/reset-password", (req, res) -> {
             String token = req.queryParams("token");
             String newPassword = req.queryParams("newPassword");
@@ -984,7 +1018,8 @@ public class App {
                 return "";
             }
         });
-
+        */
+        /*
         post("/change-password", (req, res) -> {
             String currentPassword = req.queryParams("currentPassword");
             String newPassword = req.queryParams("newPassword");
@@ -1049,6 +1084,7 @@ public class App {
                 return "";
             }
         });
+        */
 
         post("/enrollment", (req, res) -> {
             Object userIdAttr = req.session().attribute("userId");

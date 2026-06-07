@@ -110,7 +110,7 @@ public class EmailSender {
     }
 
     public static void sendStudentRoleAddedMail(String receiver, String firstName, String lastName){
-        String title = "Nuevo perfil habilitado en tu cuenta";
+        String title = "Nuevo perfil habilitado: Estudiante";
         
         String content = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;\">\n" +
                     "    <div style=\"background-color: #10b981; padding: 20px; text-align: center;\">\n" +
@@ -124,6 +124,19 @@ public class EmailSender {
                     "        <p style=\"font-size: 14px; color: #666666; margin-bottom: 0;\">Saludos cordiales,<br><strong>El equipo de Administración</strong></p>\n" +
                     "    </div>\n" +
                     "</div>";
+
+        sendMail(receiver, title, content);
+    }
+
+    public static void sendTeacherRoleAddedMail(String receiver, String firstName, String lastName){
+        String title = "Nuevo perfil habilitado: Profesor";
+        
+        String content = "<div style='font-family: Arial; max-width: 600px; border: 1px solid #eee; border-radius: 10px; overflow: hidden;'>" +
+                            "<div style='background: #10b981; padding: 20px; text-align: center; color: white;'><h2>Perfil Docente Habilitado</h2></div>" +
+                            "<div style='padding: 30px;'>" +
+                            "<p>Hola <b>" + firstName + "</b>, ahora tienes acceso al sistema como <b>Profesor</b>.</p>" +
+                            "<p>Usa tus credenciales de siempre (DNI y tu clave actual). Podrás alternar roles desde el menú superior del Dashboard.</p>" +
+                            "</div></div>";
 
         sendMail(receiver, title, content);
     }

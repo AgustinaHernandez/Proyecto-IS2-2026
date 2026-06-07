@@ -2,32 +2,28 @@ package com.is1.proyecto.models.controllers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.is1.proyecto.models.Person;
 import com.is1.proyecto.models.Subject;
 import com.is1.proyecto.models.Teacher;
-import com.is1.proyecto.models.User;
-import com.is1.proyecto.utils.EmailSender;
-import com.is1.proyecto.utils.PasswordGenerator;
 
 import spark.ModelAndView;
 import spark.template.mustache.MustacheTemplateEngine;
 import static spark.Spark.*;
 import org.javalite.activejdbc.Base;
-import org.mindrot.jbcrypt.BCrypt; 
 
-public class TeacherController {
+public class TeacherControllerOld {
     
     public static void registrarRutas(MustacheTemplateEngine engine, ObjectMapper objectMapper) {
 
         /**
          *      Alta de profesor
          */
+
+        /*
         get("/teacher/create", (req, res) -> {
 
             Map<String, Object> model = Map.of(
@@ -169,9 +165,11 @@ public class TeacherController {
             }
         });
 
+        */
+
+
         /**
          *      Asignación de profesores
-         */
         get("/teacher/assign", (req, res) -> {
             List<Map<String, Object>> subjects = Subject.findAll().toMaps();
             // obtener el parámetro de búsqueda que el admin puso en el campo

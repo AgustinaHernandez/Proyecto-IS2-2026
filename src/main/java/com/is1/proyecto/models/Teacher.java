@@ -62,5 +62,12 @@ public class Teacher extends Model {
     public String getFullNameString() {
         return getFirstName() + " " + getLastName();
     }
-}
 
+    public Integer getFileCode(){
+        return getInteger("file_code");
+    }
+
+    public void setFileCode(Integer code){
+        set("file_code", code);
+    }
+}
