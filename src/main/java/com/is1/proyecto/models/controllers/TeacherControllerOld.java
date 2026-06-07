@@ -34,38 +34,6 @@ import org.mindrot.jbcrypt.BCrypt;
 public class TeacherControllerOld {
     
     public static String registrarRutas(MustacheTemplateEngine engine, ObjectMapper objectMapper) {
-        /**
-         *      Modificacion de Datos de profesores
-         */
-        /* get("/teacher/modify", (req, res) -> {
-            String query = req.queryParams("q");
-            List<Teacher> teachers;
-            int offset = 20;
-            if (query != null && !query.trim().isEmpty()) {
-                teachers = Teacher.findBySQL(
-                    "SELECT t.* FROM teachers t " +
-                    "JOIN persons p ON t.person_id = p.id " +
-                    "WHERE p.first_name LIKE ? OR p.last_name LIKE ? OR CAST(p.dni AS TEXT) LIKE ?",
-                    "%" + query.trim() + "%", 
-                    "%" + query.trim() + "%", 
-                    "%" + query.trim() + "% LIMIT "+offset+""
-                ).include(Person.class);
-            } else {
-                teachers = Teacher.findAll().include(Person.class);
-            }
-
-            Map<String, Object> model = Map.of(
-                "tituloPagina", "Modificar Datos Docentes",
-                "teachers", teachers,
-                "query", (query != null)? query : "",
-                "offset", offset,
-                "successMessage", req.queryParamOrDefault("message", ""),
-                "errorMessage", req.queryParamOrDefault("error", "")
-            );
-
-            return new ModelAndView(model, "teacher_modify.mustache");
-        }, engine); */
-
         get("/teacher/select-subject", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
 
