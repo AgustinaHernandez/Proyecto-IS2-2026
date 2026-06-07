@@ -3,6 +3,10 @@ package com.is1.proyecto.models.controllers;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,7 +33,7 @@ import org.mindrot.jbcrypt.BCrypt;
 
 public class TeacherController {
     
-    public static void registrarRutas(MustacheTemplateEngine engine, ObjectMapper objectMapper) {
+    public static String registrarRutas(MustacheTemplateEngine engine, ObjectMapper objectMapper) {
 
         /**
          *      Alta de profesor
@@ -110,7 +114,7 @@ public class TeacherController {
                 Teacher t = new Teacher();
                 t.set("person_id", p.getId());
                 t.set("degree", degree);
-                t.set("file_code", fileCode);
+                t.set("id", fileCode);
                 t.saveIt();
 
                 // Solo si no tiene un usuario previamente
@@ -322,6 +326,37 @@ public class TeacherController {
             return "";
         });
 
+        /**
+         *      Modificacion de Datos de profesores
+         */
+        get("/teacher/modify", (req, res) -> {
+            String query = req.queryParams("q");
+            List<Teacher> teachers;
+            int offset = 20;
+            if (query != null && !query.trim().isEmpty()) {
+                teachers = Teacher.findBySQL(
+                    "SELECT t.* FROM teachers t " +
+                    "JOIN persons p ON t.person_id = p.id " +
+                    "WHERE p.first_name LIKE ? OR p.last_name LIKE ? OR CAST(p.dni AS TEXT) LIKE ?",
+                    "%" + query.trim() + "%", 
+                    "%" + query.trim() + "%", 
+                    "%" + query.trim() + "% LIMIT "+offset+""
+                ).include(Person.class);
+            } else {
+                teachers = Teacher.findAll().include(Person.class);
+            }
+
+            Map<String, Object> model = Map.of(
+                "tituloPagina", "Modificar Datos Docentes",
+                "teachers", teachers,
+                "query", (query != null)? query : "",
+                "offset", offset,
+                "successMessage", req.queryParamOrDefault("message", ""),
+                "errorMessage", req.queryParamOrDefault("error", "")
+            );
+
+            return new ModelAndView(model, "teacher_modify.mustache");
+        }, engine);
         get("/teacher/select-subject", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
 
@@ -643,5 +678,131 @@ public class TeacherController {
         }, engine);
     }
 
+        post("/teacher/modify", (req, res) -> {
+            // 1. Obtenemos el ID del docente
+            String teacherIdStr = req.queryParams("teacher_id");
+           
+/*            if (teacherIdStr == null || teacherIdStr.isEmpty()) {
+                res.redirect("/teacher/modify?error=" + URLEncoder.encode("ID de docente no proporcionado.", StandardCharsets.UTF_8));
+                return "";
+            }
+ */
+            // Creamos el paquete vacío para la SEGUNDA página (Moustache)
+            Map<String, Object> paqueteMoustache = new HashMap<>();
+
+            // 2. Buscamos en la tabla 'Teacher' usando su propio modelo
+            List<Teacher> listaProfesores = Teacher.findBySQL("SELECT * FROM teachers WHERE id = ?", teacherIdStr);
+    
+            if (!listaProfesores.isEmpty()) {
+                Teacher profe = listaProfesores.get(0);
+        
+                // Guardamos los datos de Teacher en nuestro paquete
+                paqueteMoustache.put("teacher_id", teacherIdStr);
+                paqueteMoustache.put("degree", profe.get("degree"));
+                paqueteMoustache.put("fcode", profe.get("id"));
+        
+                // Sacamos la llave para conectar con la otra tabla
+                Object idDeLaPersona = profe.get("person_id");
+                paqueteMoustache.put("idPerson", idDeLaPersona);
+
+                // 3. Con esa llave, buscamos de inmediato en la tabla 'Person'
+                List<Person> listaPersonas = Person.findBySQL("SELECT * FROM persons WHERE id = ?", idDeLaPersona);
+        
+                if (!listaPersonas.isEmpty()) {
+                    Person pers = listaPersonas.get(0);
+            
+                    // Guardamos los datos de Person en el mismo paquete
+                    paqueteMoustache.put("firstname", pers.get("first_name"));
+                    paqueteMoustache.put("lastname", pers.get("last_name"));
+                    paqueteMoustache.put("dni", pers.get("dni"));                    
+                    paqueteMoustache.put("email", pers.get("email"));
+                }
+            }
+
+            // 4. Respondemos al POST dibujando la SEGUNDA página (el formulario de edición)
+            // Moustache va a recibir el paquete y va a rellenar los campos
+            return new ModelAndView(paqueteMoustache, "teacher_update.mustache");
+        }, new MustacheTemplateEngine());
+        //return "";
+    //}
+
+
+        post("/teacher/update", (req, res) -> {
+            // 1. Capturamos los datos EXACTOS del formulario usando los "name" del HTML
+            String idProfesor   = req.queryParams("teacher_id");
+            String first_name   = req.queryParams("firstname");
+            String last_name    = req.queryParams("lastname");
+            String e_mail        = req.queryParams("email");
+            String grade        = req.queryParams("degree"); // Captura el <select>
+            
+            // Nota: DNI y Legajo son "readonly" en tu HTML, pero conviene tenerlos 
+            // en caso de que necesites validarlos o rellenar de nuevo el modelo si algo falla.
+            String dni          = req.queryParams("dni");
+            String legajo       = req.queryParams("file_code");
+
+            try {
+                // 2. Iniciamos la transacción con la Base de Datos
+                 Base.openTransaction();
+        
+                // 3. Buscamos al docente por su ID
+                Teacher t = Teacher.findById(Integer.parseInt(idProfesor));
+        
+                if (t != null) {
+
+                    // 3. Modificamos el campo propio de la tabla 'teachers'
+                     t.set("degree", grade);
+                     t.saveIt(); // Guardamos el cambio del grado académico                    
+
+                     // 4. Obtenemos la persona vinculada a este profesor
+                    // Nota: Dependiendo de cómo definiste la relación en ActiveJDBC, 
+                    // se puede obtener comúnmente con t.parent(Person.class) o t.get(Person.class)
+                    Person p = t.parent(Person.class); 
+            
+                    if (p != null) {
+                        // 5. Modificamos los campos de la tabla 'persons'
+                        p.set("first_name", first_name);
+                        p.set("last_name", last_name);
+                        p.set("email", e_mail);
+                        //p.set("file_code", req.queryParams("file_code")); // Por si acaso
+                        p.saveIt(); // Guardamos los cambios en la tabla persons
+                    }
+                    
+                    // 5. Guardamos los cambios y confirmamos la transacción
+                    Base.commitTransaction();
+            
+                    // 6. Redirección con mensaje de éxito (puedes mandarlo al dashboard o al mismo formulario)
+                    String successMessage = URLEncoder.encode("Docente modificado correctamente en el sistema.", StandardCharsets.UTF_8);
+                    res.redirect("/dashboard?successMessage=" + successMessage);
+                    return null;
+            
+                } else {
+                    // Si por alguna razón el ID ya no existe en la BD
+                    Base.rollbackTransaction();
+                    String errorMessage = URLEncoder.encode("El docente no existe.", StandardCharsets.UTF_8);
+                    res.redirect("/dashboard?errorMessage=" + errorMessage);
+                    return null;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                Base.rollbackTransaction();                
+                // Si algo falla (ej: error de conexión), preparamos un mensaje de error 
+                // para que se muestre en tus bloques {{#errorMessage}} de Mustache
+                Map<String, Object> model = new HashMap<>();
+                model.put("errorMessage", "Error al actualizar en la base de datos: " + e.getMessage());
+                
+                // Re-inyectamos los datos para que el usuario no tenga que escribirlos de nuevo
+                model.put("firstname", first_name);
+                model.put("lastname", last_name);
+                model.put("dni", dni);
+                model.put("email", e_mail);
+                model.put("file_code", legajo);
+                model.put("degree", grade);
+                
+                return new MustacheTemplateEngine().render(
+                    new ModelAndView(model, "teacher_update.mustache")
+                );
+            }
+        });
+     return null;}
 
 }
