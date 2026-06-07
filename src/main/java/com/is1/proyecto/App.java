@@ -65,7 +65,7 @@ public class App {
         before("/teacher/create", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/new", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/assign", (req, res) -> checkAdminAccess(req, res));
-        before("/subject/new", (req, res) -> checkAdminAccess(req, res));
+        before("/subject/create", (req, res) -> checkAdminAccess(req, res));
         before("/career/create", (req, res) -> checkAdminAccess(req, res));
         before("/career/new", (req, res) -> checkAdminAccess(req, res));
         before("/teacher/unassign", (req, res) -> checkAdminAccess(req, res));
@@ -95,6 +95,10 @@ public class App {
 
         // Rutas refactorizadas
         
+        // Dashboard
+        get("/dashboard", DashboardController::renderDashboard, new MustacheTemplateEngine());
+        
+
         // Alta de carrera
         get("/career/create", CareerController::renderCreateForm, new MustacheTemplateEngine());
         post("/career/new", CareerController::handleCreateCareer);
@@ -161,6 +165,11 @@ public class App {
         post("/teacher/delete", TeacherController::handleDeleteTeacher);
 
 
+        //GET: Alta de materia
+        get("/subject/create", SubjectController::renderSubjectCreation, new MustacheTemplateEngine());
+        //POST: Alta de materia
+        post("/subject/create", SubjectController::handleSubjectCreation);     
+
 
         // GET: Muestra el formulario de inicio de sesión (login).
         get("/", AuthController::renderLoginForm, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
@@ -169,68 +178,11 @@ public class App {
         get("/logout", AuthController::handleLogout);
 
         // POST: Maneja el envío del formulario de inicio de sesión.
-        post("/login", AuthController::handleLogin, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta POST
+        post("/", AuthController::handleLogin, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta POST
 
 
         
         post("/set-role", ProfileController::handleSetRole);
-
-
-
-        // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
-        // Requiere que el usuario esté autenticado.
-        get("/dashboard", (req, res) -> {
-            Map<String, Object> model = new HashMap<>(); // Modelo para la plantilla del dashboard.
-
-            // Intenta obtener el nombre de usuario y la bandera de login de la sesión.
-            String currentUsername = req.session().attribute("currentUserUsername");
-            Boolean loggedIn = req.session().attribute("loggedIn");
-            
-            // 1. Verificar si el usuario ha iniciado sesión.
-            // Si no hay un nombre de usuario en la sesión, la bandera es nula o falsa,
-            // significa que el usuario no está logueado o su sesión expiró.
-            if (currentUsername == null || loggedIn == null || !loggedIn) {
-                System.out.println("DEBUG: Acceso no autorizado a /dashboard. Redirigiendo a /login.");
-                // Redirige al login con un mensaje de error.
-                res.redirect("/?error=Acceso no autorizado.");
-                return null; // Importante retornar null después de una redirección.
-            }
-            
-
-            //Ver qué roles tiene y cuántos son
-            boolean isStudent = (boolean) req.session().attribute("isStudent");
-            boolean isRegularStudent = (boolean) req.session().attribute("isRegularStudent");
-            boolean isTeacher = (boolean) req.session().attribute("isTeacher");
-            boolean isAdmin = (boolean) req.session().attribute("isAdmin");
-            int roleCount = (isAdmin ? 1 : 0) + (isStudent ? 1 : 0) + (isTeacher ? 1:0);
-
-            // 2. Si el usuario está logueado, añade el nombre de usuario al modelo para la plantilla.
-            model.put("username", currentUsername);
-
-            //Agregar rol activo
-            String activeRole = (String) req.session().attribute("activeRole");
-            if (activeRole == null) {
-                if (isAdmin) activeRole = "ADMIN";
-                else if (isTeacher) activeRole = "TEACHER";
-                else if (isStudent) activeRole = "STUDENT";
-                else activeRole = "NONE";
-                req.session().attribute("activeRole", activeRole);
-            }
-
-            //Agregar todos los roles para poder pasarlos al desplegable donde el usuario puede cambiar de rol
-            model.put("hasMultipleRoles", roleCount > 1);
-            model.put("isAdmin", isAdmin);
-            model.put("isTeacher", isTeacher);
-            model.put("isStudent", isStudent);
-            model.put("isRegularStudent", isRegularStudent);
-            model.put("activeRole",activeRole);    
-            model.put("isActiveAdmin", "ADMIN".equals(activeRole));
-            model.put("isActiveTeacher", "TEACHER".equals(activeRole));
-            model.put("isActiveStudent", "STUDENT".equals(activeRole));        
-            // 3. Renderiza la plantilla del dashboard con el nombre de usuario.
-            return new ModelAndView(model, "dashboard.mustache");
-        }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta.
-        
         
         // GET: Página de configuración
         get("/settings", (req, res) -> {
@@ -238,7 +190,7 @@ public class App {
             
             // Verificar sesión (opcional, pero recomendado)
             if (req.session().attribute("loggedIn") == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
             model.put("tituloPagina", "Configuración");
@@ -253,7 +205,7 @@ public class App {
             // La cookie JSESSIONID en el navegador también será gestionada para invalidarse.
             req.session().invalidate();
 
-            System.out.println("DEBUG: Sesión cerrada. Redirigiendo a /login.");
+            System.out.println("DEBUG: Sesión cerrada. Redirigiendo a /");
 
             // Redirige al usuario a la página de login con un mensaje de éxito.
             res.redirect("/");
@@ -338,24 +290,6 @@ public class App {
             return new ModelAndView(model, "perfil_usuario.mustache");
         }, new MustacheTemplateEngine());
 
-
-        get("/subject/create", (req, res) -> {
-            // select de todos los profesores con sus datos de la tabla persona
-            List<Teacher> teachers = Teacher.findAll().include(Person.class);
-            // buscamos los planes
-            List<Plan> plans = Plan.findAll().include(Career.class); 
-            // mapeo para pasarle al mustache luego
-            Map<String, Object> model = Map.of(
-                "tituloPagina", "Alta de materia",
-                "teachers", teachers,
-                "plans", plans, // agregar planes al modelo
-                "errorMessage", req.queryParamOrDefault("errorMessage", ""),
-                "successMessage", req.queryParamOrDefault("successMessage", "")
-            );
-            return new ModelAndView(model, "subject_form.mustache");
-        }, new MustacheTemplateEngine());
-
-
 /*
         get("/plan/new",(req, res) -> { 
             List<Plan> plans = Plan.findAll().include(Career.class);
@@ -400,7 +334,7 @@ public class App {
             Object userIdAttr = req.session().attribute("userId");
             if (userIdAttr == null) {
                 req.session().attribute("error", "Acceso no autorizado.");
-                res.redirect("/login"); 
+                res.redirect("/"); 
                 return null;
             }
             
@@ -415,7 +349,7 @@ public class App {
             
             User user = User.findById(userIdAttr);
             if (user == null) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
             
@@ -480,7 +414,7 @@ public class App {
 
 /*
         // POST: Maneja el envío del formulario de inicio de sesión.
-        post("/login", (req, res) -> {
+        post("/", (req, res) -> {
             Map<String, Object> model = new HashMap<>(); // Modelo para la plantilla de login o dashboard.
             model.put("tituloPagina","Iniciar Sesión");
 
@@ -575,43 +509,6 @@ public class App {
             }
         }, new MustacheTemplateEngine()); // Especifica el motor de plantillas para esta ruta POST.
 */
-        post("/subject/new", (req, res) -> {
-            String id = req.queryParams("code"); 
-            String name = req.queryParams("name");
-            String respId = req.queryParams("responsible_id");
-            String planId = req.queryParams("plan_id");
-
-            if (id == null || name == null || respId == null || id.isEmpty() || name.isEmpty() || planId == null || planId.isEmpty()) {
-                res.redirect("/subject/create?error=" + URLEncoder.encode("Faltan datos obligatorios", "UTF-8"));
-                return "";
-            }
-
-            try {
-                Base.openTransaction();
-                Subject s = new Subject();
-                s.set("code", Integer.parseInt(id));
-                s.set("name", name);
-                s.set("responsible_id", Integer.parseInt(respId));
-                if (s.saveIt()) {
-                    // si se guardó la materia, la asocio al plan
-                    Plan p = Plan.findById(Integer.parseInt(planId));
-                    if (p != null) {
-                        s.add(p); // acá ActiveJDBC hace el insert a subject_belongs_plan, por el @Many2Many
-                    }
-                    Base.commitTransaction();
-                    res.redirect("/subject/create?successMessage=" + URLEncoder.encode("Materia '" + name + "' creada y asignada con éxito :D", "UTF-8"));
-                } else {
-                    Base.rollbackTransaction();
-                    res.redirect("/subject/create?errorMessage=" + URLEncoder.encode("Error de validación: " + s.errors(), "UTF-8"));
-                }
-            } catch (Exception e) {
-                Base.rollbackTransaction();
-                e.printStackTrace();
-                res.redirect("/subject/create?errorMessage=" + URLEncoder.encode("Error: El código ya existe o es inválido", "UTF-8"));
-            }
-            return "";
-        });
-
         
 /*
         post("/plan/new", (req, res) -> {
@@ -806,7 +703,7 @@ public class App {
             String activeRole = req.session().attribute("activeRole");
 
             if (userIdAttr == null || !"STUDENT".equals(activeRole)) {
-                res.redirect("/login");
+                res.redirect("/");
                 return null;
             }
 

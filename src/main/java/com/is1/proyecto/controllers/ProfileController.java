@@ -13,7 +13,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** Rutas --------------------------
- * /dashboard (GET), 
  * /set-role (POST), 
  * /profile (GET), 
  * /settings (GET), 
