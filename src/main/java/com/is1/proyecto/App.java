@@ -20,10 +20,12 @@ import java.util.HashMap; // Para crear mapas de datos (modelos para las plantil
 import java.util.List;
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 // Importaciones de clases del proyecto
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 import com.is1.proyecto.controllers.*;
 import com.is1.proyecto.models.*;
+import com.is1.proyecto.models.controllers.TeacherControllerOld;
 import com.is1.proyecto.utils.AccessControl;
 
 
@@ -32,6 +34,8 @@ import com.is1.proyecto.utils.AccessControl;
  * Configura las rutas, filtros y el inicio del servidor web.
  */
 public class App {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     /**
      * Método principal que se ejecuta al iniciar la aplicación.
      * Aquí se configuran todas las rutas y filtros de Spark.
@@ -41,7 +45,6 @@ public class App {
             
         // Obtener la instancia única del singleton de configuración de la base de datos.
         DBConfigSingleton dbConfig = DBConfigSingleton.getInstance();
-
 
         MustacheTemplateEngine engine = new MustacheTemplateEngine();
 
@@ -100,6 +103,9 @@ public class App {
 
 
         // Rutas refactorizadas
+
+        // Registrar rutas viejas de TeacherControllerOld. Trabajo de refactorizar pendiente.
+        TeacherControllerOld.registrarRutas(engine, objectMapper);
         
         // Dashboard
         get("/dashboard", DashboardController::renderDashboard, new MustacheTemplateEngine());
