@@ -153,16 +153,7 @@ public class StudentController {
         Object personId = user.get("person_id");
         String mode = req.queryParams("mode");
 
-        String subjectsQuery = "SELECT s.code, s.name, fs.year, fg.grade " + 
-                                "FROM (SELECT * FROM enrolled_plan WHERE plan_id = ? AND student_id = ?) AS ep " + //Subconsulta para plan seleccionado
-                                "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " + //Materias del plan
-                                "INNER JOIN enrolled_subject es ON es.student_id = ep.student_id AND sbp.subject_id = es.subject_id " + //Materias del alumno y del plan
-                                "INNER JOIN subjects s ON es.subject_id = s.id " + //Materias (para sacar los datos)
-                                "INNER JOIN final_sheets fs ON s.id = fs.subject_id " +  
-                                "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id " + 
-                                "WHERE fg.student_id = ?";
-
-        PerformanceQueryResult query = StudentService.performanceQuery(planId, personId, mode, subjectsQuery);
+        PerformanceQueryResult query = StudentService.performanceQuery(planId, personId, mode);
         model.put("subjects", query.subjects);
         model.put("hasSubjects", !query.allSubjects.isEmpty());
         model.put("mode", mode);

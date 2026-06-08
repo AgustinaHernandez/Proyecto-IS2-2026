@@ -117,8 +117,17 @@ public class StudentService {
     /**
      *  ---------------- ACADEMIC PERFORMANCE QUERY  ------------------------------------------
      */
-    public static PerformanceQueryResult performanceQuery(String planId, Object personId, String mode, String subjectsQuery){
-        Student student = Student.findFirst("person_id = ?", personId);       
+    public static PerformanceQueryResult performanceQuery(String planId, Object personId, String mode){
+        Student student = Student.findFirst("person_id = ?", personId);
+
+        String baseQuery = "SELECT s.code, s.name, fs.year, fg.grade " + 
+                           "FROM enrolled_plan ep " +
+                           "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " +
+                           "INNER JOIN subjects s ON sbp.subject_id = s.id " +
+                           "INNER JOIN final_sheets fs ON s.id = fs.subject_id " +  
+                           "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id AND fg.student_id = ep.student_id " + 
+                           "WHERE ep.plan_id = ? AND ep.student_id = ? AND fg.grade IS NOT NULL";
+
         String gradeMode = "";
         boolean both = false;
         if(mode.equals("aprobadas")){
@@ -129,8 +138,9 @@ public class StudentService {
             both = true;
         }
 
-        List<Map> subjects = Base.findAll(subjectsQuery + gradeMode, planId, student.getId(), student.getId());
-        List<Map> allSubjects = Base.findAll(subjectsQuery, planId, student.getId(), student.getId());
+
+        List<Map> subjects = Base.findAll(baseQuery + gradeMode, planId, student.getId());
+        List<Map> allSubjects = Base.findAll(baseQuery, planId, student.getId());
         
         float totalAverage = 0;
         float approvedAverage = 0;

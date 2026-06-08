@@ -246,19 +246,8 @@ public class App {
             model.put("enrolled", enrolled);
             return new ModelAndView(model, "choose_subjects.mustache");
         }, new MustacheTemplateEngine());
-/* 
-        get("/academic-performance", (req, res) -> {
-            Map<String, Object> model = new HashMap<>();
-            Object userId = req.session().attribute("userId");
-            User user = User.findById(userId);
-            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
 
-            List<Enrolled_Plan> enrolled = Enrolled_Plan.where("student_id = ?", student.getId()).include(Plan.class);
-
-            model.put("enrolled", enrolled);
-            return new ModelAndView(model, "enrolled_careers.mustache");
-        }, new MustacheTemplateEngine());
-        */
+        
         // GET: Muestra el formulario de inscripción a la carrera/plan
         get("/student/enroll-plan", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
@@ -446,67 +435,6 @@ public class App {
         }, new MustacheTemplateEngine());
 
 
-/*
-        post("/academic-performance", (req, res) -> { //REUBICAR
-            Map<String, Object> model = new HashMap<>();
-            String planId = req.queryParams("plan_id");
-            Object userId = req.session().attribute("userId");
-            User user = User.findById(userId);
-            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
-            String subjectsQuery = "SELECT s.code, s.name, fs.year, fg.grade " + 
-                                "FROM (SELECT * FROM enrolled_plan WHERE plan_id = ? AND student_id = ?) AS ep " + //Subconsulta para plan seleccionado
-                                "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " + //Materias del plan
-                                "INNER JOIN enrolled_subject es ON es.student_id = ep.student_id AND sbp.subject_id = es.subject_id " + //Materias del alumno y del plan
-                                "INNER JOIN subjects s ON es.subject_id = s.id " + //Materias (para sacar los datos)
-                                "INNER JOIN final_sheets fs ON s.id = fs.subject_id " +  
-                                "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id " + 
-                                "WHERE fg.student_id = ?";
-
-            String mode = req.queryParams("mode");
-            String gradeMode = "";
-            boolean both = false;
-            if(mode.equals("aprobadas")){
-                gradeMode = " AND fg.grade >= 5";
-            } else if (mode.equals("desaprobadas")){
-                gradeMode = " AND fg.grade < 5";
-            } else {
-                both = true;
-            }
-            
-            List<Map> subjects = Base.findAll(subjectsQuery + gradeMode, planId, student.getId(), student.getId());
-            List<Map> allSubjects = Base.findAll(subjectsQuery, planId, student.getId(), student.getId());
-
-            float totalAverage = 0;
-            float approvedAverage = 0;
-            int approvedSubjects = 0;
-            for(Map m : allSubjects){
-                Object rawGrade = m.get("grade");
-                float grade = ((Number) rawGrade).floatValue();
-                if(grade >= 5){
-                    approvedAverage += grade;
-                    approvedSubjects++;
-                }
-                totalAverage += grade;
-            }
-
-            if(!allSubjects.isEmpty()){
-                totalAverage /= allSubjects.size();
-            } //Si no hay materias, el promedio no se muestra, por ende, no importa cómo haya quedado
-            if(approvedSubjects > 0){
-                approvedAverage /= approvedSubjects;
-            } else {
-                approvedAverage = 0;
-            }
-
-            model.put("subjects", subjects);
-            model.put("hasSubjects", !allSubjects.isEmpty());
-            model.put("mode", mode);
-            model.put("both", both);
-            model.put("totalAverage", totalAverage);
-            model.put("approvedAverage", approvedAverage);
-            return new ModelAndView(model, "academic_performance.mustache");
-        }, new MustacheTemplateEngine());
-        */
         // --- Rutas POST para manejar envíos de formularios y APIs ---
 
         //GET: /logout
@@ -639,14 +567,14 @@ public class App {
             User user = User.findById(userId);
             Student student = Student.findFirst("person_id = ?", user.get("person_id"));
 
-            String sharedHead = "SELECT s.code, s.name, st.initial_condition";
+            String sharedHead = "SELECT s.code, s.name, st.initial_condition ";
 
-            String sharedBody = " FROM enrolled_plan ep" +
+            String sharedBody = " FROM enrolled_plan ep " +
                                 "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " +
                                 "INNER JOIN subjects s ON sbp.subject_id = s.id " +
                                 "INNER JOIN grade_sheets g ON s.id = g.subject_id " +
                                 "INNER JOIN statuses st ON g.id = st.grade_sheet_id AND st.student_id = ep.student_id " +
-                                "WHERE ep.plan_id = ? AND ep.student_id = ? AND st.final_condition ";                
+                                "WHERE ep.plan_id = ? AND ep.student_id = ? AND st.final_condition ";
 
             String currSubjectsQuery = sharedHead + sharedBody + "= 'INSCRIPTO'";
 
@@ -671,79 +599,22 @@ public class App {
             User user = User.findById(userId);
             Student student = Student.findFirst("person_id = ?", user.get("person_id"));
 
-            String finalSubjectsQuery = "SELECT s.code, s.name, fs.call, fs.year, fg.grade " + 
-                                "FROM (SELECT * FROM enrolled_plan WHERE plan_id = ? AND student_id = ?) AS ep " +
-                                "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " + 
-                                "INNER JOIN enrolled_subject es ON es.student_id = ep.student_id AND sbp.subject_id = es.subject_id " + 
-                                "INNER JOIN subjects s ON es.subject_id = s.id " +
-                                "INNER JOIN final_sheets fs ON s.id = fs.subject_id " + 
-                                "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id " + 
-                                "WHERE fg.student_id = ?";
+            String finalSubjectsQuery = 
+                    "SELECT s.code, s.name, fs.call, fs.year, fg.grade " + 
+                    "FROM enrolled_plan ep " +
+                    "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " + 
+                    "INNER JOIN subjects s ON sbp.subject_id = s.id " +
+                    "INNER JOIN final_sheets fs ON s.id = fs.subject_id " + 
+                    "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id AND fg.student_id = ep.student_id " + 
+                    "WHERE ep.plan_id = ? AND ep.student_id = ?";
             
-            List<Map> finalSubjects = Base.findAll(finalSubjectsQuery, planId, student.getId(), student.getId());
+            List<Map> finalSubjects = Base.findAll(finalSubjectsQuery, planId, student.getId());
             model.put("finalSubjects", finalSubjects);
             return new ModelAndView(model, "final_enrollments.mustache");
         }, new MustacheTemplateEngine());
 
-        post("/academic-performance", (req, res) -> { 
-            Map<String, Object> model = new HashMap<>();
-            String planId = req.queryParams("plan_id");
-            Object userId = req.session().attribute("userId");
-            User user = User.findById(userId);
-            Student student = Student.findFirst("person_id = ?", user.get("person_id"));
-            String subjectsQuery = "SELECT s.code, s.name, fs.year, fg.grade " + 
-                                "FROM (SELECT * FROM enrolled_plan WHERE plan_id = ? AND student_id = ?) AS ep " + //Subconsulta para plan seleccionado
-                                "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " + //Materias del plan
-                                "INNER JOIN enrolled_subject es ON es.student_id = ep.student_id AND sbp.subject_id = es.subject_id " + //Materias del alumno y del plan
-                                "INNER JOIN subjects s ON es.subject_id = s.id " + //Materias (para sacar los datos)
-                                "INNER JOIN final_sheets fs ON s.id = fs.subject_id " +  
-                                "INNER JOIN final_grades fg ON fs.id = fg.final_sheet_id " + 
-                                "WHERE fg.student_id = ?";
 
-            String mode = req.queryParams("mode");
-            String gradeMode = "";
-            boolean both = false;
-            if(mode.equals("aprobadas")){
-                gradeMode = " AND fg.grade >= 5";
-            } else if (mode.equals("desaprobadas")){
-                gradeMode = " AND fg.grade < 5";
-            } else {
-                both = true;
-            }
-            
-            List<Map> subjects = Base.findAll(subjectsQuery + gradeMode, planId, student.getId(), student.getId());
-            List<Map> allSubjects = Base.findAll(subjectsQuery, planId, student.getId(), student.getId());
 
-            float totalAverage = 0;
-            float approvedAverage = 0;
-            int approvedSubjects = 0;
-            for(Map m : allSubjects){
-                Object rawGrade = m.get("grade");
-                float grade = ((Number) rawGrade).floatValue();
-                if(grade >= 5){
-                    approvedAverage += grade;
-                    approvedSubjects++;
-                }
-                totalAverage += grade;
-            }
-
-            if(!allSubjects.isEmpty()){
-                totalAverage /= allSubjects.size();
-            } //Si no hay materias, el promedio no se muestra, por ende, no importa cómo haya quedado
-            if(approvedSubjects > 0){
-                approvedAverage /= approvedSubjects;
-            } else {
-                approvedAverage = 0;
-            }
-
-            model.put("subjects", subjects);
-            model.put("hasSubjects", !allSubjects.isEmpty());
-            model.put("mode", mode);
-            model.put("both", both);
-            model.put("totalAverage", totalAverage);
-            model.put("approvedAverage", approvedAverage);
-            return new ModelAndView(model, "academic_performance.mustache");
-        }, new MustacheTemplateEngine());
         post("/final/new", (req, res) -> {
             String subjectIdStr = req.queryParams("subject_id");
             String dateStr = req.queryParams("date"); //Con formato YYYY-MM-DD
