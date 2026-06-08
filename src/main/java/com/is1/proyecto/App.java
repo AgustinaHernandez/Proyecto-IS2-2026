@@ -641,20 +641,19 @@ public class App {
 
             String sharedHead = "SELECT s.code, s.name, st.initial_condition";
 
-            String sharedBody = " FROM (SELECT * FROM enrolled_plan WHERE plan_id = ? AND student_id = ?) AS ep " +
-                                "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " + 
-                                "INNER JOIN enrolled_subject es ON es.student_id = ep.student_id AND sbp.subject_id = es.subject_id " + 
-                                "INNER JOIN subjects s ON es.subject_id = s.id " +
+            String sharedBody = " FROM enrolled_plan ep" +
+                                "INNER JOIN subject_belongs_plan sbp ON ep.plan_id = sbp.plan_id " +
+                                "INNER JOIN subjects s ON sbp.subject_id = s.id " +
                                 "INNER JOIN grade_sheets g ON s.id = g.subject_id " +
-                                "INNER JOIN statuses st ON g.id = st.grade_sheet_id " +
-                                "WHERE st.student_id = ? AND st.final_condition ";
+                                "INNER JOIN statuses st ON g.id = st.grade_sheet_id AND st.student_id = ep.student_id " +
+                                "WHERE ep.plan_id = ? AND ep.student_id = ? AND st.final_condition ";                
 
             String currSubjectsQuery = sharedHead + sharedBody + "= 'INSCRIPTO'";
 
             String gradeSubjectsQuery = sharedHead + ", g.year, st.final_condition" + sharedBody + "<> 'INSCRIPTO'";
 
-            List<Map> currSubjects = Base.findAll(currSubjectsQuery, planId, student.getId(), student.getId());
-            List<Map> gradeSubjects = Base.findAll(gradeSubjectsQuery, planId, student.getId(), student.getId());
+            List<Map> currSubjects = Base.findAll(currSubjectsQuery, planId, student.getId());
+            List<Map> gradeSubjects = Base.findAll(gradeSubjectsQuery, planId, student.getId());
 
             model.put("currSubjects", currSubjects);
             model.put("gradeSubjects", gradeSubjects);
@@ -662,6 +661,9 @@ public class App {
             return new ModelAndView(model, "grade_enrollments.mustache");
         }, new MustacheTemplateEngine());
 
+
+
+        
         post("/student/subjects/final", (req, res) -> {
             Map<String, Object> model = new HashMap<>();
             String planId = req.queryParams("plan_id");

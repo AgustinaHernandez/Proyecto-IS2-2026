@@ -49,9 +49,9 @@ public class SubjectController {
         String errorMsg = SubjectService.createSubject(id, name, respId, planId);
 
         if(errorMsg != null){
-            res.redirect("/subject/create?error=" + URLEncoder.encode(errorMsg, StandardCharsets.UTF_8));
+            res.redirect("/subject/create?errorMessage=" + URLEncoder.encode(errorMsg, StandardCharsets.UTF_8));
         }else{
-            res.redirect("/subject/create?success=" + URLEncoder.encode("Se agregó la materia existosamente.", StandardCharsets.UTF_8));
+            res.redirect("/subject/create?successMessage=" + URLEncoder.encode("Se agregó la materia existosamente.", StandardCharsets.UTF_8));
         }
 
         return "";

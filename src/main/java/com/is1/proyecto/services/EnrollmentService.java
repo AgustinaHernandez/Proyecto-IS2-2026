@@ -1,5 +1,6 @@
 package com.is1.proyecto.services;
 
+import java.time.Year;
 import java.util.List;
 
 import org.javalite.activejdbc.Base;
@@ -52,6 +53,7 @@ public class EnrollmentService {
         }
 
         try {
+            int currentYear = Year.now().getValue();
             User user = User.findById(userId);
             Student student = (user != null) ? Student.findFirst("person_id = ?", user.get("person_id")) : null;
             Subject subject = Subject.findById(subjectIdParam);
@@ -68,7 +70,13 @@ public class EnrollmentService {
             Base.openTransaction();
 
             String gsSql = "SELECT id FROM grade_sheets WHERE subject_id = ? AND year = ? LIMIT 1";
-            Object gradeSheetId = Base.firstCell(gsSql, subject.getId(), 2026);
+            Object gradeSheetId = Base.firstCell(gsSql, subject.getId(), currentYear);
+
+            if (gradeSheetId == null) {
+                Base.exec("INSERT INTO grade_sheets (subject_id, year) VALUES (?, ?)", subject.getId(), currentYear);
+                //Recuperamos el ID que se le acaba de asignar
+                gradeSheetId = Base.firstCell(gsSql, subject.getId(), currentYear);
+            }
 
             Base.exec("INSERT INTO statuses (grade_sheet_id, student_id, initial_condition, final_condition) VALUES (?, ?, ?, ?)", 
                       gradeSheetId, student.getId(), "INSCRIPTO", "INSCRIPTO");
@@ -82,7 +90,7 @@ public class EnrollmentService {
             return "Ocurrió un error inesperado en el servidor al procesar el alta.";
         }
     }
-    
+
 
 
 }

@@ -128,17 +128,6 @@ CREATE TABLE teaches(
 );
 
 
-DROP TABLE IF EXISTS enrolled_subject;
-
-CREATE TABLE enrolled_subject(
-    student_id INTEGER NOT NULL,
-    subject_id INTEGER NOT NULL,
-
-    CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES students (id),
-    CONSTRAINT fk_subject FOREIGN KEY (subject_id) REFERENCES subjects (id),
-    CONSTRAINT pk_enrolled PRIMARY KEY (student_id, subject_id)
-);
-
 DROP TABLE  IF EXISTS enrolled_plan;
 
 CREATE TABLE enrolled_plan(
